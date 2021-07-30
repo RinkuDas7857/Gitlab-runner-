@@ -723,7 +723,6 @@ func (s *VaultSecret) SecretPath() string {
 }
 
 func (s *VaultSecret) SecretFields() map[string]string {
-
 	if len(s.Fields) > 0 {
 		return s.Fields
 	}

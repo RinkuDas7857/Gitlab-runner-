@@ -80,7 +80,7 @@ func TestResolver_Resolve(t *testing.T) {
 			secret: secret,
 			assertVaultServiceMock: func(s *service.MockVault) {
 				s.On("GetFields", secret.Vault, secret.Vault).
-					Return(map[string]interface{}{"__DEFAULT__":struct{ Date string }{Date: "2020-08-24"}}, nil).
+					Return(map[string]interface{}{"__DEFAULT__": struct{ Date string }{Date: "2020-08-24"}}, nil).
 					Once()
 			},
 			expectedValue: map[string]string{"__DEFAULT__": "{2020-08-24}"},
