@@ -56,7 +56,7 @@ func TestResolver_Resolve(t *testing.T) {
 		secret                    common.Secret
 		vaultServiceCreationError error
 		assertVaultServiceMock    func(s *service.MockVault)
-		expectedValue             string
+		expectedValue             map[string]string
 		expectedError             error
 	}{
 		"error on support detection": {
@@ -70,7 +70,7 @@ func TestResolver_Resolve(t *testing.T) {
 		"error on field resolving": {
 			secret: secret,
 			assertVaultServiceMock: func(s *service.MockVault) {
-				s.On("GetField", secret.Vault, secret.Vault).
+				s.On("GetFields", secret.Vault, secret.Vault).
 					Return(nil, assert.AnError).
 					Once()
 			},
@@ -79,11 +79,11 @@ func TestResolver_Resolve(t *testing.T) {
 		"field resolved properly": {
 			secret: secret,
 			assertVaultServiceMock: func(s *service.MockVault) {
-				s.On("GetField", secret.Vault, secret.Vault).
-					Return(struct{ Date string }{Date: "2020-08-24"}, nil).
+				s.On("GetFields", secret.Vault, secret.Vault).
+					Return(map[string]interface{}{"__DEFAULT__":struct{ Date string }{Date: "2020-08-24"}}, nil).
 					Once()
 			},
-			expectedValue: "{2020-08-24}",
+			expectedValue: map[string]string{"__DEFAULT__": "{2020-08-24}"},
 			expectedError: nil,
 		},
 	}

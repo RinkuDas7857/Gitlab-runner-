@@ -38,18 +38,20 @@ func (_m *MockSecretResolver) Name() string {
 }
 
 // Resolve provides a mock function with given fields:
-func (_m *MockSecretResolver) Resolve() (string, error) {
+func (_m *MockSecretResolver) Resolve() (map[string]string, error) {
 	ret := _m.Called()
 
-	var r0 string
+	var r0 map[string]string
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (string, error)); ok {
+	if rf, ok := ret.Get(0).(func() (map[string]string, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() string); ok {
+	if rf, ok := ret.Get(0).(func() map[string]string); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(string)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {

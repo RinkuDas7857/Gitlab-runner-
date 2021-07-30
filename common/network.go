@@ -623,10 +623,11 @@ type AzureKeyVaultServer struct {
 }
 
 type VaultSecret struct {
-	Server VaultServer `json:"server"`
-	Engine VaultEngine `json:"engine"`
-	Path   string      `json:"path"`
-	Field  string      `json:"field"`
+	Server VaultServer       `json:"server"`
+	Engine VaultEngine       `json:"engine"`
+	Path   string            `json:"path"`
+	Field  string            `json:"field"`
+	Fields map[string]string `json:"fields"`
 }
 
 type VaultServer struct {
@@ -692,6 +693,9 @@ func (s *VaultSecret) expandVariables(vars JobVariables) {
 
 	s.Path = vars.ExpandValue(s.Path)
 	s.Field = vars.ExpandValue(s.Field)
+	for field, value := range s.Fields {
+		s.Fields[field] = vars.ExpandValue(value)
+	}
 }
 
 func (s *VaultSecret) AuthName() string {
@@ -718,8 +722,13 @@ func (s *VaultSecret) SecretPath() string {
 	return s.Path
 }
 
-func (s *VaultSecret) SecretField() string {
-	return s.Field
+func (s *VaultSecret) SecretFields() map[string]string {
+
+	if len(s.Fields) > 0 {
+		return s.Fields
+	}
+
+	return map[string]string{"__DEFAULT__": s.Field}
 }
 
 func (s *VaultServer) expandVariables(vars JobVariables) {

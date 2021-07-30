@@ -9,15 +9,17 @@ type MockSecret struct {
 	mock.Mock
 }
 
-// SecretField provides a mock function with given fields:
-func (_m *MockSecret) SecretField() string {
+// SecretFields provides a mock function with given fields:
+func (_m *MockSecret) SecretFields() map[string]string {
 	ret := _m.Called()
 
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
+	var r0 map[string]string
+	if rf, ok := ret.Get(0).(func() map[string]string); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(string)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
 	}
 
 	return r0

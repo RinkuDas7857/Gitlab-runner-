@@ -30,7 +30,7 @@ type secretResolverFactory func(secret Secret) SecretResolver
 type SecretResolver interface {
 	Name() string
 	IsSupported() bool
-	Resolve() (string, error)
+	Resolve() (map[string]string, error)
 }
 
 var (
@@ -108,14 +108,14 @@ func (r *defaultSecretsResolver) Resolve(secrets Secrets) (JobVariables, error) 
 		}
 
 		if v != nil {
-			variables = append(variables, *v)
+			variables = append(variables, v...)
 		}
 	}
 
 	return variables, nil
 }
 
-func (r *defaultSecretsResolver) handleSecret(variableKey string, secret Secret) (*JobVariable, error) {
+func (r *defaultSecretsResolver) handleSecret(variableKey string, secret Secret) ([]JobVariable, error) {
 	sr, err := r.secretResolverRegistry.GetFor(secret)
 	if err != nil {
 		r.logger.Warningln(fmt.Sprintf("Not resolved: %v", err))
@@ -124,7 +124,7 @@ func (r *defaultSecretsResolver) handleSecret(variableKey string, secret Secret)
 
 	r.logger.Println(fmt.Sprintf("Using %q secret resolver...", sr.Name()))
 
-	value, err := sr.Resolve()
+	values, err := sr.Resolve()
 	if errors.Is(err, ErrSecretNotFound) {
 		if !r.featureFlagOn(featureflags.EnableSecretResolvingFailsIfMissing) {
 			err = nil
@@ -136,13 +136,24 @@ func (r *defaultSecretsResolver) handleSecret(variableKey string, secret Secret)
 		return nil, err
 	}
 
-	variable := &JobVariable{
-		Key:    variableKey,
-		Value:  value,
-		File:   secret.IsFile(),
-		Masked: true,
-		Raw:    true,
+	var variables []JobVariable
+
+	for key, value := range values {
+		jobVariableKey := fmt.Sprintf("%s_%s", variableKey, key)
+
+		// If only a single field is requested and not the `Fields` secret key is set, do not use suffix naming for job variables
+		if key == "__DEFAULT__" && len(values) == 1 {
+			jobVariableKey = variableKey
+		}
+
+		variables = append(variables, JobVariable{
+			Key:    jobVariableKey,
+			Value:  value,
+			File:   secret.IsFile(),
+			Masked: true,
+			Raw:    true,
+		})
 	}
 
-	return variable, nil
+	return variables, nil
 }

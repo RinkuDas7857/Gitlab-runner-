@@ -130,9 +130,11 @@ func TestDefaultVault_GetField(t *testing.T) {
 	secretPath := "path"
 	secretField := "field_1"
 	secretValue := 1
+	secretField2 := "field_2"
+	secretValue2 := 2
 	secretData := map[string]interface{}{
 		secretField: secretValue,
-		"field_2":   "test",
+		secretField2: secretValue2,
 	}
 
 	tests := map[string]struct {
@@ -164,23 +166,35 @@ func TestDefaultVault_GetField(t *testing.T) {
 			assertEngineMock: assertEngineMock,
 			assertSecretMock: func(s *MockSecret) {
 				s.On("SecretPath").Return(secretPath).Once()
-				s.On("SecretField").Return("unknown_field").Once()
+				s.On("SecretFields").Return(map[string]string{"__DEFAULT__": "unknown_field"}).Once()
 			},
 			assertSecretEngineMock: func(e *vault.MockSecretEngine) {
 				e.On("Get", secretPath).Return(secretData, nil).Once()
 			},
-			expectedResult: nil,
+			expectedResult: map[string]interface{}{},
 		},
 		"data requested properly with found field": {
 			assertEngineMock: assertEngineMock,
 			assertSecretMock: func(s *MockSecret) {
 				s.On("SecretPath").Return(secretPath).Once()
-				s.On("SecretField").Return(secretField).Once()
+				s.On("SecretFields").Return(map[string]string{"__DEFAULT__": secretField}).Once()
 			},
 			assertSecretEngineMock: func(e *vault.MockSecretEngine) {
 				e.On("Get", secretPath).Return(secretData, nil).Once()
 			},
-			expectedResult: secretValue,
+			expectedResult: map[string]interface{}{"__DEFAULT__": secretValue},
+		},
+
+		"data requested properly with found fields": {
+			assertEngineMock: assertEngineMock,
+			assertSecretMock: func(s *MockSecret) {
+				s.On("SecretPath").Return(secretPath).Once()
+				s.On("SecretFields").Return(map[string]string{"KEY1": secretField, "KEY2": secretField2}).Once()
+			},
+			assertSecretEngineMock: func(e *vault.MockSecretEngine) {
+				e.On("Get", secretPath).Return(secretData, nil).Once()
+			},
+			expectedResult: map[string]interface{}{"KEY1": secretValue, "KEY2": secretValue2},
 		},
 	}
 
@@ -218,7 +232,7 @@ func TestDefaultVault_GetField(t *testing.T) {
 				client: clientMock,
 			}
 
-			data, err := service.GetField(engineMock, secretMock)
+			data, err := service.GetFields(engineMock, secretMock)
 
 			if tt.expectedError != nil {
 				assert.ErrorAs(t, err, &tt.expectedError)

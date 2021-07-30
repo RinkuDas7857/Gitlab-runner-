@@ -187,7 +187,7 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 					Maybe()
 				if tt.supportedResolverPresent {
 					supportedResolver.On("Resolve").
-						Return(returnValue, tt.errorOnSecretResolving).
+						Return(map[string]string{"__DEFAULT__": returnValue}, tt.errorOnSecretResolving).
 						Once()
 				}
 			}

@@ -32,9 +32,9 @@ func (v *resolver) IsSupported() bool {
 	return v.secret.Vault != nil
 }
 
-func (v *resolver) Resolve() (string, error) {
+func (v *resolver) Resolve() (map[string]string, error) {
 	if !v.IsSupported() {
-		return "", secrets.NewResolvingUnsupportedSecretError(resolverName)
+		return nil, secrets.NewResolvingUnsupportedSecretError(resolverName)
 	}
 
 	secret := v.secret.Vault
@@ -44,19 +44,24 @@ func (v *resolver) Resolve() (string, error) {
 
 	s, err := newVaultService(url, namespace, secret)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	data, err := s.GetField(secret, secret)
+	data, err := s.GetFields(secret, secret)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if data == nil {
-		return "", common.ErrSecretNotFound
+		return nil, common.ErrSecretNotFound
 	}
 
-	return fmt.Sprintf("%v", data), nil
+	resolved := make(map[string]string)
+	for key, value := range data {
+		resolved[key] = fmt.Sprintf("%v", value)
+	}
+
+	return resolved, nil
 }
 
 func init() {

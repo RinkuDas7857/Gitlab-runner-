@@ -23,20 +23,20 @@ func (_m *MockVault) Delete(engineDetails Engine, secretDetails Secret) error {
 	return r0
 }
 
-// GetField provides a mock function with given fields: engineDetails, secretDetails
-func (_m *MockVault) GetField(engineDetails Engine, secretDetails Secret) (interface{}, error) {
+// GetFields provides a mock function with given fields: engineDetails, secretDetails
+func (_m *MockVault) GetFields(engineDetails Engine, secretDetails Secret) (map[string]interface{}, error) {
 	ret := _m.Called(engineDetails, secretDetails)
 
-	var r0 interface{}
+	var r0 map[string]interface{}
 	var r1 error
-	if rf, ok := ret.Get(0).(func(Engine, Secret) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(Engine, Secret) (map[string]interface{}, error)); ok {
 		return rf(engineDetails, secretDetails)
 	}
-	if rf, ok := ret.Get(0).(func(Engine, Secret) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(Engine, Secret) map[string]interface{}); ok {
 		r0 = rf(engineDetails, secretDetails)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(map[string]interface{})
 		}
 	}
 

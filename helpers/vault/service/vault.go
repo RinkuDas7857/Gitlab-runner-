@@ -27,12 +27,12 @@ type Engine interface {
 //go:generate mockery --name=Secret --inpackage
 type Secret interface {
 	SecretPath() string
-	SecretField() string
+	SecretFields() map[string]string
 }
 
 //go:generate mockery --name=Vault --inpackage
 type Vault interface {
-	GetField(engineDetails Engine, secretDetails Secret) (interface{}, error)
+	GetFields(engineDetails Engine, secretDetails Secret) (map[string]interface{}, error)
 	Put(engineDetails Engine, secretDetails Secret, data map[string]interface{}) error
 	Delete(engineDetails Engine, secretDetails Secret) error
 }
@@ -98,7 +98,7 @@ func (v *defaultVault) prepareAuthMethodAdapter(authDetails Auth) (vault.AuthMet
 	return auth, nil
 }
 
-func (v *defaultVault) GetField(engineDetails Engine, secretDetails Secret) (interface{}, error) {
+func (v *defaultVault) GetFields(engineDetails Engine, secretDetails Secret) (map[string]interface{}, error) {
 	engine, err := v.getSecretEngine(engineDetails)
 	if err != nil {
 		return nil, err
@@ -109,16 +109,17 @@ func (v *defaultVault) GetField(engineDetails Engine, secretDetails Secret) (int
 		return nil, fmt.Errorf("reading secret: %w", err)
 	}
 
-	field := secretDetails.SecretField()
+	fields := secretDetails.SecretFields()
+	fieldData := make(map[string]interface{})
 	for key, data := range secret {
-		if key != field {
-			continue
+		for suffix, field := range fields {
+			if key == field {
+				fieldData[suffix] = data
+			}
 		}
-
-		return data, nil
 	}
 
-	return nil, nil
+	return fieldData, nil
 }
 
 func (v *defaultVault) getSecretEngine(engineDetails Engine) (vault.SecretEngine, error) {
