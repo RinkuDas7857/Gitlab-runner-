@@ -56,7 +56,7 @@ func (v *resolver) Resolve() (map[string]string, error) {
 		return nil, common.ErrSecretNotFound
 	}
 
-	resolved := make(map[string]string)
+	resolved := make(map[string]string, len(data))
 	for key, value := range data {
 		resolved[key] = fmt.Sprintf("%v", value)
 	}

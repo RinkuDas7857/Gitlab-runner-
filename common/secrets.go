@@ -136,8 +136,8 @@ func (r *defaultSecretsResolver) handleSecret(variableKey string, secret Secret)
 		return nil, err
 	}
 
-	var variables []JobVariable
 	jobVariableKey := ""
+	variables := make([]JobVariable, 0, len(values))
 
 	for key, value := range values {
 		// If only a single field is requested and not the `Fields` secret key is set,
