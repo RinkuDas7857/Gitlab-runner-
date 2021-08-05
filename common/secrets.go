@@ -137,13 +137,13 @@ func (r *defaultSecretsResolver) handleSecret(variableKey string, secret Secret)
 	}
 
 	var variables []JobVariable
+	jobVariableKey := ""
 
 	for key, value := range values {
-		jobVariableKey := fmt.Sprintf("%s_%s", variableKey, key)
-
 		// If only a single field is requested and not the `Fields` secret key is set,
 		// do not use suffix naming for job variables
-		if key == "__DEFAULT__" && len(values) == 1 {
+		jobVariableKey = fmt.Sprintf("%s_%s", variableKey, key)
+		if key == SecretSingleFieldReservedKey && len(values) == 1 {
 			jobVariableKey = variableKey
 		}
 

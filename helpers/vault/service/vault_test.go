@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/gitlab-org/gitlab-runner/common"
 	"gitlab.com/gitlab-org/gitlab-runner/helpers/vault"
 	"gitlab.com/gitlab-org/gitlab-runner/helpers/vault/auth_methods"
 	"gitlab.com/gitlab-org/gitlab-runner/helpers/vault/internal/registry"
@@ -166,7 +167,9 @@ func TestDefaultVault_GetField(t *testing.T) {
 			assertEngineMock: assertEngineMock,
 			assertSecretMock: func(s *MockSecret) {
 				s.On("SecretPath").Return(secretPath).Once()
-				s.On("SecretFields").Return(map[string]string{"__DEFAULT__": "unknown_field"}).Once()
+				s.On("SecretFields").Return(
+					map[string]string{common.SecretSingleFieldReservedKey: "unknown_field"},
+				).Once()
 			},
 			assertSecretEngineMock: func(e *vault.MockSecretEngine) {
 				e.On("Get", secretPath).Return(secretData, nil).Once()
@@ -177,12 +180,14 @@ func TestDefaultVault_GetField(t *testing.T) {
 			assertEngineMock: assertEngineMock,
 			assertSecretMock: func(s *MockSecret) {
 				s.On("SecretPath").Return(secretPath).Once()
-				s.On("SecretFields").Return(map[string]string{"__DEFAULT__": secretField}).Once()
+				s.On("SecretFields").Return(
+					map[string]string{common.SecretSingleFieldReservedKey: secretField},
+				).Once()
 			},
 			assertSecretEngineMock: func(e *vault.MockSecretEngine) {
 				e.On("Get", secretPath).Return(secretData, nil).Once()
 			},
-			expectedResult: map[string]interface{}{"__DEFAULT__": secretValue},
+			expectedResult: map[string]interface{}{common.SecretSingleFieldReservedKey: secretValue},
 		},
 
 		"data requested properly with found fields": {

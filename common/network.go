@@ -601,6 +601,8 @@ type JobResponse struct {
 	TLSAuthKey  string `json:"-"`
 }
 
+const SecretSingleFieldReservedKey = "__DEFAULT__"
+
 type Secrets map[string]Secret
 
 type Secret struct {
@@ -727,7 +729,7 @@ func (s *VaultSecret) SecretFields() map[string]string {
 		return s.Fields
 	}
 
-	return map[string]string{"__DEFAULT__": s.Field}
+	return map[string]string{SecretSingleFieldReservedKey: s.Field}
 }
 
 func (s *VaultServer) expandVariables(vars JobVariables) {
