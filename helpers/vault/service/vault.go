@@ -110,7 +110,6 @@ func (v *defaultVault) GetFields(engineDetails Engine, secretDetails Secret) (ma
 	}
 
 	fields := secretDetails.SecretFields()
-	fieldData := make(map[string]interface{})
 	fieldData := make(map[string]interface{}, len(fields))
 	for suffix, field := range fields {
 		if data, ok := secret[field]; ok {
