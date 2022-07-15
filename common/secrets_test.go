@@ -13,7 +13,11 @@ import (
 
 func TestDefaultResolver_Resolve(t *testing.T) {
 	variableKey := "TEST_VARIABLE"
+	multiField1 := "FIELD1"
+	multiField2 := "FIELD2"
 	returnValue := "test"
+	returnValue2 := "test"
+
 	secrets := Secrets{
 		variableKey: Secret{
 			Vault: &VaultSecret{
@@ -35,6 +39,36 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 		},
 	}
 
+	secretsMultiField := Secrets{
+		variableKey: Secret{
+			Vault: &VaultSecret{
+				Server: VaultServer{
+					URL: "url",
+					Auth: VaultAuth{
+						Name: "name",
+						Path: "path",
+						Data: VaultAuthData{"data": "data"},
+					},
+				},
+				Engine: VaultEngine{
+					Name: "name",
+					Path: "path",
+				},
+				Path: "path",
+				Fields: map[string]string{
+					multiField1: returnValue,
+					multiField2: returnValue2,
+				},
+			},
+		},
+	}
+
+	resolverSingleValue := map[string]string{SecretSingleFieldReservedKey: returnValue}
+	resolverMultiValue := map[string]string{
+		multiField1: returnValue,
+		multiField2: returnValue2,
+	}
+
 	composeSecrets := func(file bool) Secrets {
 		secret := secrets[variableKey]
 		secret.File = &file
@@ -52,6 +86,7 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 	tests := map[string]struct {
 		getLogger                     func(t *testing.T) (logger, func())
 		supportedResolverPresent      bool
+		resolverValue                 map[string]string
 		secrets                       Secrets
 		resolvedVariable              *JobVariable
 		failIfSecretMissing           bool
@@ -69,6 +104,7 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 		"no secrets to resolve": {
 			getLogger:                getLogger,
 			supportedResolverPresent: true,
+			resolverValue:            resolverSingleValue,
 			secrets:                  nil,
 			expectedVariables:        nil,
 			expectedError:            nil,
@@ -76,6 +112,7 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 		"error on secret resolving": {
 			getLogger:                getLogger,
 			supportedResolverPresent: true,
+			resolverValue:            resolverSingleValue,
 			secrets:                  secrets,
 			errorOnSecretResolving:   assert.AnError,
 			expectedVariables:        nil,
@@ -84,6 +121,7 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 		"secret resolved properly - file not defined": {
 			getLogger:                getLogger,
 			supportedResolverPresent: true,
+			resolverValue:            resolverSingleValue,
 			secrets:                  secrets,
 			expectedVariables: JobVariables{
 				{
@@ -96,9 +134,29 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		"multi secret resolved properly - file not defined": {
+			getLogger:                getLogger,
+			supportedResolverPresent: true,
+			resolverValue:            resolverMultiValue,
+			secrets:                  secretsMultiField,
+			expectedVariables: JobVariables{
+				{
+					Key:   variableKey + "_" + multiField1,
+					Value: returnValue,
+					File:  true,
+				},
+				{
+					Key:   variableKey + "_" + multiField2,
+					Value: returnValue2,
+					File:  true,
+				},
+			},
+			expectedError: nil,
+		},
 		"secret resolved properly - file set to true": {
 			getLogger:                getLogger,
 			supportedResolverPresent: true,
+			resolverValue:            resolverSingleValue,
 			secrets:                  composeSecrets(true),
 			expectedVariables: JobVariables{
 				{
@@ -114,6 +172,7 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 		"secret resolved properly - file set to false": {
 			getLogger:                getLogger,
 			supportedResolverPresent: true,
+			resolverValue:            resolverSingleValue,
 			secrets:                  composeSecrets(false),
 			expectedVariables: JobVariables{
 				{
@@ -187,7 +246,7 @@ func TestDefaultResolver_Resolve(t *testing.T) {
 					Maybe()
 				if tt.supportedResolverPresent {
 					supportedResolver.On("Resolve").
-						Return(map[string]string{SecretSingleFieldReservedKey: returnValue}, tt.errorOnSecretResolving).
+						Return(tt.resolverValue, tt.errorOnSecretResolving).
 						Once()
 				}
 			}
