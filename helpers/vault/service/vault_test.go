@@ -132,10 +132,11 @@ func TestDefaultVault_GetField(t *testing.T) {
 	secretField := "field_1"
 	secretValue := 1
 	secretField2 := "field_2"
-	secretValue2 := 2
+	secretValue2 := "test"
 	secretData := map[string]interface{}{
 		secretField:  secretValue,
 		secretField2: secretValue2,
+		"field_3":    true,
 	}
 
 	tests := map[string]struct {
