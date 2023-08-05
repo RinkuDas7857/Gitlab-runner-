@@ -1777,8 +1777,12 @@ func (s *executor) preparePodServices() ([]api.Container, error) {
 	podServices := make([]api.Container, len(s.options.Services))
 
 	for i, service := range s.options.Services {
+		serviceName := service.Alias
+		if serviceName == "" {
+			serviceName = fmt.Sprintf("%s%d", serviceContainerPrefix, i)
+		}
 		podServices[i], err = s.buildContainer(containerBuildOpts{
-			name:               fmt.Sprintf("%s%d", serviceContainerPrefix, i),
+			name:               serviceName,
 			image:              service.Name,
 			imageDefinition:    service,
 			isServiceContainer: true,
