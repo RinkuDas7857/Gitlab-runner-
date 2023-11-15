@@ -139,6 +139,7 @@ func TestRunIntegrationTestsWithFeatureFlag(t *testing.T) {
 		"testKubernetesFailingBuildForBashAndPwshFeatureFlag":     testKubernetesFailingBuildForBashAndPwshFeatureFlag,
 		"testKubernetesPodEvents":                                 testKubernetesPodEvents,
 		"testKubernetesDumbInitSuccessRun":                        testKubernetesDumbInitSuccessRun,
+		"testKubernetesServiceContainerAlias":                     testKubernetesServiceContainerAlias,
 	}
 
 	featureFlags := []string{
@@ -2136,6 +2137,86 @@ func testKubernetesContainerHookFeatureFlag(t *testing.T, featureFlagName string
 
 			out, err := buildtest.RunBuildReturningOutput(t, build)
 			tt.validateOutputs(t, out, err)
+		})
+	}
+}
+
+func testKubernetesServiceContainerAlias(t *testing.T, featureFlagName string, featureFlagValue bool) {
+	helpers.SkipIntegrationTests(t, "kubectl", "cluster-info")
+
+	ctxTimeout := time.Minute
+	client := getTestKubeClusterClient(t)
+
+	tests := map[string]struct {
+		services   common.Services
+		lookupName string
+	}{
+		"service container without alias": {
+			services: common.Services{
+				{
+					Name: common.TestAlpineImage,
+				},
+			},
+			lookupName: "svc-0",
+		},
+		"service container with alias": {
+			services: common.Services{
+				{
+					Name:  common.TestAlpineImage,
+					Alias: "alpine-service",
+				},
+			},
+			lookupName: "alpine-service",
+		},
+	}
+
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+			build := getTestBuild(t, func() (common.JobResponse, error) {
+				return common.GetRemoteBuildResponse(
+					"sleep 5000",
+				)
+			})
+			build.Services = tc.services
+			buildtest.SetBuildFeatureFlag(build, featureFlagName, featureFlagValue)
+
+			deletedPodNameCh := make(chan string)
+			defer buildtest.OnUserStage(build, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+				defer cancel()
+				pods, err := client.CoreV1().
+					Pods(kubernetes.DefaultResourceIdentifier).
+					List(
+						ctx,
+						metav1.ListOptions{
+							LabelSelector: labels.Set(build.Runner.Kubernetes.PodLabels).String(),
+						},
+					)
+				require.NoError(t, err)
+				require.NotEmpty(t, pods.Items)
+				pod := pods.Items[0]
+
+				names := make([]string, 0)
+				for _, container := range pod.Spec.Containers {
+					names = append(names, container.Name)
+				}
+
+				assert.Contains(t, names, tc.lookupName)
+
+				err = client.
+					CoreV1().
+					Pods(kubernetes.DefaultResourceIdentifier).
+					Delete(ctx, pod.Name, metav1.DeleteOptions{
+						PropagationPolicy: &kubernetes.PropagationPolicy,
+					})
+				require.NoError(t, err)
+
+				deletedPodNameCh <- pod.Name
+			})()
+
+			err := build.Run(&common.Config{}, &common.Trace{Writer: os.Stdout})
+			require.Error(t, err)
+			<-deletedPodNameCh
 		})
 	}
 }
