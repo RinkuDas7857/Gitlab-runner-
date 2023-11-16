@@ -2159,7 +2159,7 @@ func testKubernetesServiceContainerAlias(t *testing.T, featureFlagName string, f
 			},
 			lookupName: "svc-0",
 		},
-		"service container with alias": {
+		"service container with valid DNS 1123 alias": {
 			services: common.Services{
 				{
 					Name:  common.TestAlpineImage,
@@ -2167,6 +2167,15 @@ func testKubernetesServiceContainerAlias(t *testing.T, featureFlagName string, f
 				},
 			},
 			lookupName: "alpine-service",
+		},
+		"service container with non valid DNS 1123 alias": {
+			services: common.Services{
+				{
+					Name:  common.TestAlpineImage,
+					Alias: "alpine service",
+				},
+			},
+			lookupName: "svc-0",
 		},
 	}
 

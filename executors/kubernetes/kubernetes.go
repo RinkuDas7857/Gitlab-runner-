@@ -32,6 +32,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/samber/lo"
 
@@ -1777,9 +1778,11 @@ func (s *executor) preparePodServices() ([]api.Container, error) {
 	podServices := make([]api.Container, len(s.options.Services))
 
 	for i, service := range s.options.Services {
-		serviceName := service.Alias
-		if serviceName == "" {
-			serviceName = fmt.Sprintf("%s%d", serviceContainerPrefix, i)
+		serviceName := fmt.Sprintf("%s%d", serviceContainerPrefix, i)
+		// For the alias to be used as container name, it must follow the RFC 1123 definition of a DNS label
+		// https://github.com/kubernetes/kubernetes/blob/7f2d0c0f710617ef1f5eec4745b23e0d3f360037/pkg/util/validation.go#L42-L46
+		if len(validation.IsDNS1123Label(service.Alias)) == 0 {
+			serviceName = service.Alias
 		}
 		podServices[i], err = s.buildContainer(containerBuildOpts{
 			name:               serviceName,
