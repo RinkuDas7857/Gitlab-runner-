@@ -51,6 +51,11 @@ echo ""
 echo "$out_json"
 Exit 0
 `
+	// ANSI escape sequences for powershell/pwsh.  The "`e" notation for ESC was added in PowerShell 6,
+	// apparently, so we use [char]0x1B instead.
+	pwshAnsiClear     = "$([char]0x1B)[0K"
+	pwshAnsiBoldGreen = "$([char]0x1B)[32;1m"
+	pwshAnsiReset     = "$([char]0x1B)[0;m"
 )
 
 type powershellChangeUserError struct {
@@ -250,10 +255,18 @@ func (p *PsWriter) CommandArgExpand(command string, arguments ...string) {
 }
 
 func (p *PsWriter) SectionStart(id, command string, options []string) {
-	p.Noticef("$ %s", command)
+	str := "Write-Output \"section_start:$([MATH]::Round((Get-Date -UFormat %s))):" +
+		"section_" + id + stringifySectionOptions(options) + "$([char]0x0D)" +
+		pwshAnsiClear + pwshAnsiBoldGreen + psReplaceSpecialChars(command) +
+		pwshAnsiReset + "\""
+	p.Line(str)
 }
 
-func (p *PsWriter) SectionEnd(id string) {}
+func (p *PsWriter) SectionEnd(id string) {
+	str := "Write-Output \"section_end:$([MATH]::Round((Get-Date -UFormat %s))):" +
+		"section_" + id + "`r" + pwshAnsiClear + "\""
+	p.Line(str)
+}
 
 func (p *PsWriter) buildCommand(quoter stringQuoter, command string, arguments ...string) string {
 	list := []string{
