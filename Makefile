@@ -283,6 +283,10 @@ packagecloud_releases:
 		ARGS="$(ARGS)" \
 		run_go_script
 
+load_helper_images_in_local_docker_daemon:
+	# loading the helper images in the local Docker daemon
+	@./scripts/load_helper_images
+
 release_helper_docker_images:
 	# Releasing GitLab Runner Helper images
 	@./ci/release_helper_docker_images

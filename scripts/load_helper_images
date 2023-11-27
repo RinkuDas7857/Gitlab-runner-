@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Specify the directory path
+folder_path="out/helper-images"
+
+# Loop through each file in the directory
+for file in "${folder_path}"/*; do
+    if [ -f "${file}" ]; then
+        tag=$(echo "${file}" | sed -E 's/^.*prebuilt-(.*)\.tar\.xz$/\1/')
+        echo "${tag}"
+        docker import "${file}" "${REGISTRY}/gitlab-runner-helper:${tag}"
+    fi
+done

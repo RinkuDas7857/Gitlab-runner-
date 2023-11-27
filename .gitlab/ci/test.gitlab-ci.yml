@@ -204,6 +204,7 @@ integration test:
   - 'helper images'
   - 'prepare done'
   script:
+  - make load_helper_images_in_local_docker_daemon
   - go install gitlab.com/gitlab-org/fleeting/fleeting-plugin-static/cmd/fleeting-plugin-static@latest
   - >
     splitic test \
