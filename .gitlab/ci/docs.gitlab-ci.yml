@@ -17,7 +17,7 @@
     GIT_STRATEGY: none
     DOCS_REVIEW_APPS_DOMAIN: docs.gitlab-review.app
     # By default, deploy the Review App using the `main` branch of the `gitlab-org/gitlab-docs` project
-    DOCS_BRANCH: main
+    DOCS_BRANCH: axil-skip-repos-trigger
   allow_failure: true
 
 # Trigger a docs build in gitlab-docs

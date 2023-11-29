@@ -126,7 +126,7 @@ memory, CPU limits, and more.
 ### Monitoring runners
 
 You can use Prometheus to [**monitor**](monitoring/index.md) your runners.
-You can view things like the number of currently-running jobs and how
+You can view things like the number of running jobs and how
 much CPU your runners are using.
 
 ### Use a runner to run jobs
