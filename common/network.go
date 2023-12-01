@@ -609,45 +609,6 @@ type Secret struct {
 	File          *bool                `json:"file,omitempty"`
 }
 
-type AzureKeyVaultSecret struct {
-	Name    string              `json:"name"`
-	Version string              `json:"version,omitempty"`
-	Server  AzureKeyVaultServer `json:"server"`
-}
-
-type AzureKeyVaultServer struct {
-	ClientID string `json:"client_id"`
-	TenantID string `json:"tenant_id"`
-	JWT      string `json:"jwt"`
-	URL      string `json:"url"`
-}
-
-type VaultSecret struct {
-	Server VaultServer `json:"server"`
-	Engine VaultEngine `json:"engine"`
-	Path   string      `json:"path"`
-	Field  string      `json:"field"`
-}
-
-type VaultServer struct {
-	URL       string    `json:"url"`
-	Auth      VaultAuth `json:"auth"`
-	Namespace string    `json:"namespace"`
-}
-
-type VaultAuth struct {
-	Name string        `json:"name"`
-	Path string        `json:"path"`
-	Data VaultAuthData `json:"data"`
-}
-
-type VaultAuthData map[string]interface{}
-
-type VaultEngine struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-}
-
 func (s Secrets) expandVariables(vars JobVariables) {
 	for _, secret := range s {
 		secret.expandVariables(vars)
@@ -675,6 +636,19 @@ func (s Secret) IsFile() bool {
 	return *s.File
 }
 
+type AzureKeyVaultSecret struct {
+	Name    string              `json:"name"`
+	Version string              `json:"version,omitempty"`
+	Server  AzureKeyVaultServer `json:"server"`
+}
+
+type AzureKeyVaultServer struct {
+	ClientID string `json:"client_id"`
+	TenantID string `json:"tenant_id"`
+	JWT      string `json:"jwt"`
+	URL      string `json:"url"`
+}
+
 func (s *AzureKeyVaultSecret) expandVariables(vars JobVariables) {
 	s.Server.expandVariables(vars)
 
@@ -684,6 +658,32 @@ func (s *AzureKeyVaultSecret) expandVariables(vars JobVariables) {
 
 func (s *AzureKeyVaultServer) expandVariables(vars JobVariables) {
 	s.JWT = vars.ExpandValue(s.JWT)
+}
+
+type VaultSecret struct {
+	Server VaultServer `json:"server"`
+	Engine VaultEngine `json:"engine"`
+	Path   string      `json:"path"`
+	Field  string      `json:"field"`
+}
+
+type VaultServer struct {
+	URL       string    `json:"url"`
+	Auth      VaultAuth `json:"auth"`
+	Namespace string    `json:"namespace"`
+}
+
+type VaultAuth struct {
+	Name string        `json:"name"`
+	Path string        `json:"path"`
+	Data VaultAuthData `json:"data"`
+}
+
+type VaultAuthData map[string]interface{}
+
+type VaultEngine struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
 }
 
 func (s *VaultSecret) expandVariables(vars JobVariables) {
