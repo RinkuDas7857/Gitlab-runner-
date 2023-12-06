@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jpillora/backoff"
 	"github.com/sirupsen/logrus"
 
 	"gitlab.com/gitlab-org/gitlab-runner/common/buildlogger"
@@ -607,10 +608,21 @@ func (b *Build) attemptExecuteStage(
 	if attempts < 1 || attempts > 10 {
 		return fmt.Errorf("number of attempts out of the range [1, 10] for stage: %s", buildStage)
 	}
+
+	retry := backoff.Backoff{
+		Min:    5 * time.Second,
+		Max:    5 * time.Minute,
+		Jitter: true,
+	}
+
 	for attempt := 0; attempt < attempts; attempt++ {
 		if err = b.executeStage(ctx, buildStage, executor); err == nil {
 			return
 		}
+
+		duration := retry.Duration()
+		b.logger.Infoln(fmt.Sprintf("Retrying in %v", duration))
+		time.Sleep(retry.Duration())
 	}
 	return
 }
