@@ -29,6 +29,7 @@ var (
 	dockerMachineVersion       = env.NewDefault("DOCKER_MACHINE_VERSION", "v0.16.2-gitlab.23")
 	dockerMachineAmd64Checksum = env.NewDefault("DOCKER_MACHINE_AMD64_CHECKSUM", "99043581ef46b7a78417a8137d6b62f535620bf970b10ae36d510d152675da98")
 	dockerMachineArm64Checksum = env.NewDefault("DOCKER_MACHINE_ARM64_CHECKSUM", "378b735a90cb4abe4be34ebfffa76ddadcee4664fd7fdf1e38cb526745376ef5")
+	dockerMachineArmhfChecksum = env.NewDefault("DOCKER_MACHINE_ARMHF_CHECKSUM", "76d7bc90db862994d6e883cdb330525b4eed72b450f0cc6b0996956de579ffe9")
 	// s390x and ppc64le are not being released
 	dockerMachineS390xChecksum   = env.New("DOCKER_MACHINE_S390X_CHECKSUM")
 	dockerMachinePpc64leChecksum = env.New("DOCKER_MACHINE_PPC64LE_CHECKSUM")
@@ -119,6 +120,7 @@ func AssembleBuildRunner(flavor, targetArchs string) build.TargetBlueprint[runne
 		ubiFIPSVersion,
 		dockerMachineAmd64Checksum,
 		dockerMachineArm64Checksum,
+		dockerMachineArmhfChecksum,
 		dockerMachineS390xChecksum,
 		dockerMachinePpc64leChecksum,
 		dumbInitAmd64Checksum,

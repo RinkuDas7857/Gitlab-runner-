@@ -24,15 +24,15 @@
     - IMAGE_FLAVOR: ubi-fips
       TARGET_ARCHS: amd64
     - IMAGE_FLAVOR: ubuntu
-      TARGET_ARCHS: amd64 arm64 ppc64le s390x
+      TARGET_ARCHS: amd64 arm64 armhf ppc64le s390x
     - IMAGE_FLAVOR: alpine3.15
-      TARGET_ARCHS: amd64 arm64 ppc64le s390x
+      TARGET_ARCHS: amd64 arm64 armhf ppc64le s390x
     - IMAGE_FLAVOR: alpine3.16
-      TARGET_ARCHS: amd64 arm64 ppc64le s390x
+      TARGET_ARCHS: amd64 arm64 armhf ppc64le s390x
     - IMAGE_FLAVOR: alpine3.17
-      TARGET_ARCHS: amd64 arm64 ppc64le s390x
+      TARGET_ARCHS: amd64 arm64 armhf ppc64le s390x
     - IMAGE_FLAVOR: alpine3.18
-      TARGET_ARCHS: amd64 arm64 ppc64le s390x
+      TARGET_ARCHS: amd64 arm64 armhf ppc64le s390x
 
 .sync_docker_images:
   stage: release
