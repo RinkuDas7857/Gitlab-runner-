@@ -43,6 +43,7 @@ import (
 	"gitlab.com/gitlab-org/gitlab-runner/helpers/featureflags"
 	"gitlab.com/gitlab-org/gitlab-runner/helpers/limitwriter"
 	"gitlab.com/gitlab-org/gitlab-runner/shells"
+	"gitlab.com/gitlab-org/gitlab-runner/steps"
 )
 
 const (
@@ -754,6 +755,8 @@ func (e *executor) startAndWatchContainer(ctx context.Context, id string, input 
 	if id == e.buildContainerID && e.helperImageInfo.OSType != helperimage.OSTypeWindows {
 		// send SIGTERM to all processes in the build container.
 		gracefulExitFunc = e.sendSIGTERMToContainerProcs
+		dockerExec = exec.NewStepsDocker(e.Context, e.client, e.waiter, e.Build.Log(),
+			e.Build.ID, steps.ExpandSteps(e.Build.Steps, e.Build.GetAllVariables()))
 	}
 	return dockerExec.Exec(ctx, id, streams, gracefulExitFunc)
 }
