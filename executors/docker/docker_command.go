@@ -192,7 +192,7 @@ func (s *commandExecutor) requestBuildContainer() (*types.ContainerJSON, error) 
 	s.buildContainer, err = s.createContainer(
 		buildContainerType,
 		s.Build.Image,
-		s.BuildShell.DockerCommand,
+		[]string{"/step-runner", "serve"},
 		[]string{},
 	)
 	if err != nil {
