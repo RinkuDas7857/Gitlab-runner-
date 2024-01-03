@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -12,6 +13,8 @@ import (
 
 	"gitlab.com/gitlab-org/gitlab-runner/executors/docker/internal/wait"
 	"gitlab.com/gitlab-org/gitlab-runner/helpers/docker"
+	steps_api "gitlab.com/gitlab-org/step-runner/pkg/service"
+	"gitlab.com/gitlab-org/step-runner/proto"
 )
 
 // conn is an interface wrapper used to generate mocks that are next used for tests
@@ -138,5 +141,90 @@ func attachOptions() types.ContainerAttachOptions {
 		Stdin:  true,
 		Stdout: true,
 		Stderr: true,
+	}
+}
+
+type stepsDocker struct {
+	ctx    context.Context
+	client docker.Client
+	waiter wait.KillWaiter
+	logger logrus.FieldLogger
+	jobID  string
+	steps  []*proto.Step
+}
+
+func NewStepsDocker(ctx context.Context, client docker.Client, waiter wait.KillWaiter, logger logrus.FieldLogger,
+	jobID int64, steps []*proto.Step,
+) Docker {
+	return &stepsDocker{
+		ctx:    ctx,
+		client: client,
+		waiter: waiter,
+		logger: logger,
+		steps:  steps,
+		jobID:  strconv.FormatInt(jobID, 10),
+	}
+}
+
+func (sd *stepsDocker) Exec(ctx context.Context, containerID string, streams IOStreams, gracefulExitFunc wait.GracefulExitFunc) error {
+	sd.logger.Debugln("Executing steps on container", containerID, "...")
+
+	// This is only necessary if we want to capture logs generated in the build container by the step-runner, and then
+	// we need to adjust the ContainerAttachOptions.
+	// hijacked, err := sd.client.ContainerAttach(ctx, containerID, types.ContainerAttachOptions{})
+	// if err != nil {
+	// 	return err
+	// }
+	// defer hijacked.Close()
+
+	sd.logger.Debugln("Starting container", containerID, "...")
+	err := sd.client.ContainerStart(ctx, containerID, types.ContainerStartOptions{})
+	if err != nil {
+		return err
+	}
+
+	sd.sendSteps(ctx, streams)
+
+	return sd.waiter.StopKillWait(sd.ctx, containerID, nil, gracefulExitFunc)
+}
+
+const serverAddr = "localhost:8765"
+
+func (sd *stepsDocker) sendSteps(ctx context.Context, streams IOStreams) error {
+	client, err := steps_api.NewClient(serverAddr)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	err = client.RunStep(ctx, sd.jobID, sd.steps)
+	if err != nil {
+		return err
+	}
+	defer client.Cancel(ctx, sd.jobID)
+
+	stream, err := client.Follow(ctx, sd.jobID)
+	if err != nil {
+		return err
+	}
+
+	var result []*proto.StepResult
+	defer func() {
+		if result == nil {
+			return
+		}
+		// save results file here, and configure it to be an artifact.
+	}()
+
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		result = append(result, res.GetResult())
+		streams.Stdout.Write(res.GetOutput())
 	}
 }
