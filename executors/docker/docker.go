@@ -23,6 +23,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
@@ -592,7 +593,7 @@ func (e *executor) createContainer(
 		return nil, fmt.Errorf("failed to create container configuration: %w", err)
 	}
 
-	hostConfig, err := e.createHostConfig()
+	hostConfig, err := e.createHostConfig(containerType)
 	if err != nil {
 		return nil, err
 	}
@@ -658,6 +659,10 @@ func (e *executor) createContainerConfig(
 		} else {
 			config.User = user
 		}
+
+		ports := nat.PortSet{}
+		ports[nat.Port("8765")] = struct{}{}
+		config.ExposedPorts = ports
 	}
 
 	config.Entrypoint = e.overwriteEntrypoint(&imageDefinition)
@@ -681,7 +686,7 @@ func (e *executor) getBuildContainerUser(imageDefinition common.Image) (string, 
 	return user, nil
 }
 
-func (e *executor) createHostConfig() (*container.HostConfig, error) {
+func (e *executor) createHostConfig(containerType string) (*container.HostConfig, error) {
 	nanoCPUs, err := e.Config.Docker.GetNanoCPUs()
 	if err != nil {
 		return nil, err
@@ -698,6 +703,16 @@ func (e *executor) createHostConfig() (*container.HostConfig, error) {
 		return nil, err
 	}
 
+	portBindings := nat.PortMap{}
+	if containerType == buildContainerType {
+		portBindings[nat.Port("8765")] = []nat.PortBinding{
+			{
+				HostIP:   "localhost",
+				HostPort: "8765",
+			},
+		}
+	}
+
 	return &container.HostConfig{
 		Resources: container.Resources{
 			Memory:            e.Config.Docker.GetMemory(),
@@ -712,6 +727,7 @@ func (e *executor) createHostConfig() (*container.HostConfig, error) {
 			DeviceCgroupRules: e.Config.Docker.DeviceCgroupRules,
 			Ulimits:           ulimits,
 		},
+		PortBindings:  portBindings,
 		DNS:           e.Config.Docker.DNS,
 		DNSSearch:     e.Config.Docker.DNSSearch,
 		Runtime:       e.Config.Docker.Runtime,
