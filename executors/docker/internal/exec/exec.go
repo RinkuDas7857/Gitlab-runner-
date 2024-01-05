@@ -2,9 +2,14 @@ package exec
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net"
+	"os"
+	"path"
 	"strconv"
 
 	"github.com/docker/docker/api/types"
@@ -145,24 +150,26 @@ func attachOptions() types.ContainerAttachOptions {
 }
 
 type stepsDocker struct {
-	ctx    context.Context
-	client docker.Client
-	waiter wait.KillWaiter
-	logger logrus.FieldLogger
-	jobID  string
-	steps  []*proto.Step
+	ctx      context.Context
+	client   docker.Client
+	waiter   wait.KillWaiter
+	logger   logrus.FieldLogger
+	jobID    string
+	steps    []*proto.Step
+	buildDir string
 }
 
 func NewStepsDocker(ctx context.Context, client docker.Client, waiter wait.KillWaiter, logger logrus.FieldLogger,
-	jobID int64, steps []*proto.Step,
+	jobID int64, steps []*proto.Step, buildDir string,
 ) Docker {
 	return &stepsDocker{
-		ctx:    ctx,
-		client: client,
-		waiter: waiter,
-		logger: logger,
-		steps:  steps,
-		jobID:  strconv.FormatInt(jobID, 10),
+		ctx:      ctx,
+		client:   client,
+		waiter:   waiter,
+		logger:   logger,
+		steps:    steps,
+		jobID:    strconv.FormatInt(jobID, 10),
+		buildDir: buildDir,
 	}
 }
 
@@ -213,7 +220,9 @@ func (sd *stepsDocker) sendSteps(ctx context.Context, streams IOStreams) error {
 		if result == nil {
 			return
 		}
-		// save results file here, and configure it to be an artifact.
+		// save results file here, and configure it to be an artifact. Obviously this doesn't work because this is not
+		// executing within docker build or helper container, so the build-dir does not exist in this context.
+		sd.writeStepResult(result)
 	}()
 
 	for {
@@ -227,4 +236,18 @@ func (sd *stepsDocker) sendSteps(ctx context.Context, streams IOStreams) error {
 		result = append(result, res.GetResult())
 		streams.Stdout.Write(res.GetOutput())
 	}
+}
+
+func (sd *stepsDocker) writeStepResult(result []*proto.StepResult) error {
+	bytes, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error marshaling step results: %w", err)
+	}
+	outputFile := path.Join(sd.buildDir, "step-results.json")
+	err = os.WriteFile(outputFile, bytes, 0640)
+	if err != nil {
+		return fmt.Errorf("writing step results to %v: %w", outputFile, err)
+	}
+	log.Printf("trace written to %v\n", outputFile)
+	return nil
 }

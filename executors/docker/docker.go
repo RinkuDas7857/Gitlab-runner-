@@ -772,7 +772,7 @@ func (e *executor) startAndWatchContainer(ctx context.Context, id string, input 
 		// send SIGTERM to all processes in the build container.
 		gracefulExitFunc = e.sendSIGTERMToContainerProcs
 		dockerExec = exec.NewStepsDocker(e.Context, e.client, e.waiter, e.Build.Log(),
-			e.Build.ID, steps.ExpandSteps(e.Build.Steps, e.Build.GetAllVariables()))
+			e.Build.ID, steps.ExpandSteps(e.Build.Steps, e.Build.GetAllVariables()), e.Build.BuildDir)
 	}
 	return dockerExec.Exec(ctx, id, streams, gracefulExitFunc)
 }
