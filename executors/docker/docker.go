@@ -395,9 +395,9 @@ func (e *executor) createService(
 
 	var serviceName string
 	if strings.HasPrefix(version, "@sha256") {
-		serviceName = fmt.Sprintf("%s%s...", service, version); // service@digest
+		serviceName = fmt.Sprintf("%s%s...", service, version) // service@digest
 	} else {
-		serviceName = fmt.Sprintf("%s:%s...", service, version); // service:version
+		serviceName = fmt.Sprintf("%s:%s...", service, version) // service:version
 	}
 
 	e.BuildLogger.Println("Starting service", serviceName)
