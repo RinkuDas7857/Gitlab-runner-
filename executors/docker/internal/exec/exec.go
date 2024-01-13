@@ -202,40 +202,43 @@ func (sd *stepsDocker) sendSteps(ctx context.Context, streams IOStreams) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
 
-	err = client.RunStep(ctx, sd.jobID, sd.steps)
-	if err != nil {
-		return err
+	stdoutC := make(chan []byte)
+	stderrC := make(chan []byte)
+	stepResultC := make(chan *proto.StepResult)
+	defer close(stdoutC)
+	defer close(stderrC)
+	defer close(stepResultC)
+
+	out := steps_api.Output{
+		Stdout:     stdoutC,
+		Stderr:     stderrC,
+		StepResult: stepResultC, // this is how we ignore one of the result streams
 	}
-	defer client.Cancel(ctx, sd.jobID)
 
-	stream, err := client.Follow(ctx, sd.jobID)
-	if err != nil {
-		return err
-	}
-
-	var result []*proto.StepResult
-	defer func() {
-		if result == nil {
-			return
+	go func() {
+		for {
+			select {
+			case stream, ok := <-stdoutC:
+				if !ok {
+					return
+				}
+				streams.Stdout.Write(stream)
+			case stream, ok := <-stderrC:
+				if !ok {
+					return
+				}
+				streams.Stderr.Write(stream)
+			case stepResult, ok := <-stepResultC:
+				if !ok {
+					return
+				}
+				sd.writeStepResult([]*proto.StepResult{stepResult})
+			}
 		}
-		// save results file here, and configure it to be an artifact. Obviously this doesn't work because this is not
-		// executing within docker build or helper container, so the build-dir does not exist in this context.
-		sd.writeStepResult(result)
 	}()
 
-	for {
-		res, err := stream.Recv()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		result = append(result, res.GetResult())
-		streams.Stdout.Write(res.GetOutput())
-	}
+	return client.RunAndFollow(ctx, sd.jobID, sd.buildDir, sd.steps, &out)
 }
 
 func (sd *stepsDocker) writeStepResult(result []*proto.StepResult) error {
