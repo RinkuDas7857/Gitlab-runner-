@@ -51,6 +51,7 @@ if [[ $IMAGE_SHELL == 'pwsh' ]]; then
         else
                 BASE_IMAGE="registry.gitlab.com/gitlab-org/gitlab-runner/powershell:${PWSH_VERSION}-${TARGET_FLAVOR}-${PWSH_TARGET_FLAVOR_IMAGE_VERSION}-${PWSH_IMAGE_DATE}"
         fi
+        TARGET_FLAVOR_IMAGE_VERSION=${PWSH_TARGET_FLAVOR_IMAGE_VERSION}
 else
         TARGET_FLAVOR_IMAGE_VERSION=$4
 
@@ -77,6 +78,16 @@ case "${TARGET_ARCH}" in
         ;;
 *)
         platform_arch="${TARGET_ARCH}"
+        ;;
+esac
+
+# Set up PACKAGE_ARCH. Alpine packages use architectures like aarch64 and x86_64.
+case "${TARGET_ARCH}" in
+"arm64")
+        PACKAGE_ARCH=aarch64
+        ;;
+*)
+        PACKAGE_ARCH=${TARGET_ARCH}
         ;;
 esac
 
@@ -107,6 +118,9 @@ _docker_buildx build \
         --build-arg "http_proxy=${http_proxy}" \
         --build-arg "DUMB_INIT_VERSION=${DUMB_INIT_VERSION}" \
         --build-arg "GIT_LFS_VERSION=${GIT_LFS_VERSION}" \
+        --build-arg "PACKAGE_ARCH=${PACKAGE_ARCH}" \
+        --build-arg "TARGET_FLAVOR=${TARGET_FLAVOR}" \
+        --build-arg "TARGET_FLAVOR_IMAGE_VERSION=${TARGET_FLAVOR_IMAGE_VERSION}" \
         --output "type=tar,dest=$TARGET_FILE" \
         --tag "gitlab/gitlab-runner-helper:$TARGET_ARCH-$REVISION" \
         --file "dockerfiles/runner-helper/${DOCKERFILE}" \
