@@ -109,6 +109,10 @@ echo -e "Building helper image for: ${GRN}${platform}${RST} based on ${GRN}${BAS
 trap cleanup_docker_context_trap ERR SIGINT SIGTERM
 setup_docker_context
 
+# When run in CI, TARGET_FLAVOR_IMAGE_VERSION may include 3 components, but we only
+# want the first two components for accessing the gitlab pre-built package registry.
+SHORT_TARGET_FLAVOR_IMAGE_VERSION=`echo ${TARGET_FLAVOR_IMAGE_VERSION} | sed -rn 's/^([0-9]+)\.([0-9]+).*$/\1.\2/p'`
+
 # shellcheck disable=SC2154
 _docker_buildx build \
         --platform "${platform}" \
@@ -120,7 +124,7 @@ _docker_buildx build \
         --build-arg "GIT_LFS_VERSION=${GIT_LFS_VERSION}" \
         --build-arg "PACKAGE_ARCH=${PACKAGE_ARCH}" \
         --build-arg "TARGET_FLAVOR=${TARGET_FLAVOR}" \
-        --build-arg "TARGET_FLAVOR_IMAGE_VERSION=${TARGET_FLAVOR_IMAGE_VERSION}" \
+        --build-arg "SHORT_TARGET_FLAVOR_IMAGE_VERSION=${SHORT_TARGET_FLAVOR_IMAGE_VERSION}" \
         --output "type=tar,dest=$TARGET_FILE" \
         --tag "gitlab/gitlab-runner-helper:$TARGET_ARCH-$REVISION" \
         --file "dockerfiles/runner-helper/${DOCKERFILE}" \
