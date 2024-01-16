@@ -111,7 +111,11 @@ setup_docker_context
 
 # When run in CI, TARGET_FLAVOR_IMAGE_VERSION may include 3 components, but we only
 # want the first two components for accessing the gitlab pre-built package registry.
+# We also use alpine:latest, which doesn't have any numeric content...
 SHORT_TARGET_FLAVOR_IMAGE_VERSION=`echo ${TARGET_FLAVOR_IMAGE_VERSION} | sed -rn 's/^([0-9]+)\.([0-9]+).*$/\1.\2/p'`
+if [ -z "${SHORT_TARGET_FLAVOR_IMAGE_VERSION}" ]; then
+    SHORT_TARGET_FLAVOR_IMAGE_VERSION=${TARGET_FLAVOR_IMAGE_VERSION}
+fi
 
 # shellcheck disable=SC2154
 _docker_buildx build \
