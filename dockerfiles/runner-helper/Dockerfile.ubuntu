@@ -1,18 +1,12 @@
 ARG BASE_IMAGE
-
-FROM $BASE_IMAGE AS dumb_init
+FROM $BASE_IMAGE
 
 ARG DUMB_INIT_VERSION
+ARG PACKAGE_ARCH
+ADD https://gitlab.com/api/v4/projects/52695599/packages/generic/debian/0/dumb-init_${DUMB_INIT_VERSION}_${PACKAGE_ARCH}.deb dumb-init.deb
 
-RUN apt-get update && apt-get install -y bash ca-certificates git git-lfs
-
-RUN apt-get install -y gcc make && \
-    mkdir -p /tmp/dumb-init && \
-    cd /tmp/dumb-init && \
-    git clone --branch v${DUMB_INIT_VERSION} https://github.com/Yelp/dumb-init.git /tmp/dumb-init && \
-    make
-
-FROM $BASE_IMAGE
+# Force architecture to avoid complaint about arm vs armhf
+RUN dpkg --force architecture -i ./dumb-init.deb
 
 # gitlab-runner-helper will try to resolve `sh` from the path. We ensure the PATH is populated by default, as some container runtimes do no longer set a default (e.g. containerd v1.2.8)
 ENV PATH="${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
@@ -21,8 +15,6 @@ RUN apt-get update && apt-get install -y bash ca-certificates git git-lfs && \
     rm -rf /var/lib/apt/lists/*
 
 RUN git lfs install --skip-repo
-
-COPY --from=dumb_init /tmp/dumb-init/dumb-init /usr/bin
 
 COPY ./helpers/entrypoint /
 RUN chmod +x /entrypoint
