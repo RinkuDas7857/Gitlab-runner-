@@ -236,6 +236,9 @@ type executor struct {
 	options     *kubernetesOptions
 	services    []api.Service
 
+	// Masked job variables are saved in this secret and then included in build containers.
+	maskedVariablesSecret *api.Secret
+
 	configurationOverwrites *overwrites
 	pullManager             pull.Manager
 
@@ -602,6 +605,11 @@ func (s *executor) setupPodLegacy(ctx context.Context) error {
 		return err
 	}
 
+	err = s.setupMaskedVariablesSecret(ctx)
+	if err != nil {
+		return fmt.Errorf("setting up secret: %w", err)
+	}
+
 	var initContainers []api.Container
 	if s.Build.IsFeatureFlagOn(featureflags.UseDumbInitWithKubernetesExecutor) &&
 		s.helperImageInfo.OSType != helperimage.OSTypeWindows {
@@ -680,6 +688,11 @@ func (s *executor) ensurePodsConfigured(ctx context.Context) error {
 	err := s.setupCredentials(ctx)
 	if err != nil {
 		return fmt.Errorf("setting up credentials: %w", err)
+	}
+
+	err = s.setupMaskedVariablesSecret(ctx)
+	if err != nil {
+		return fmt.Errorf("setting up secret: %w", err)
 	}
 
 	permissionsInitContainer, err := s.buildPermissionsInitContainer(s.helperImageInfo.OSType)
@@ -1051,6 +1064,20 @@ func (s *executor) cleanupResources() {
 			s.BuildLogger.Errorln(fmt.Sprintf("Error cleaning up secrets: %s", err.Error()))
 		}
 	}
+
+	if s.maskedVariablesSecret != nil {
+		kubeRequest := newRetryableKubeAPICall(func() error {
+			// kubeAPI: secrets, delete
+			return s.kubeClient.CoreV1().
+				Secrets(s.configurationOverwrites.namespace).
+				Delete(ctx, s.maskedVariablesSecret.Name, metav1.DeleteOptions{
+					GracePeriodSeconds: s.Config.Kubernetes.GetCleanupGracePeriodSeconds(),
+				})
+		})
+		if err := kubeRequest.Run(); err != nil {
+			s.BuildLogger.Errorln(fmt.Sprintf("Error cleaning up secrets: %s", err.Error()))
+		}
+	}
 }
 
 //nolint:funlen
@@ -1124,6 +1151,7 @@ func (s *executor) buildContainer(opts containerBuildOpts) (api.Container, error
 		Command:         command,
 		Args:            args,
 		Env:             buildVariables(envVars),
+		EnvFrom:         s.envFromSecret(),
 		Resources: api.ResourceRequirements{
 			Limits:   opts.limits,
 			Requests: opts.requests,
@@ -1136,6 +1164,30 @@ func (s *executor) buildContainer(opts containerBuildOpts) (api.Container, error
 	}
 
 	return container, nil
+}
+
+// Containers are configured with environment variables from masked secrets, which
+// are sourced from a single k8s secret whose name is taken from the project and job IDs.
+func (s *executor) envFromSecret() []api.EnvFromSource {
+	if s.maskedVariablesSecret == nil {
+		return []api.EnvFromSource{}
+	}
+
+	optional := false
+
+	return []api.EnvFromSource{
+		{
+			Prefix: "",
+			ConfigMapRef: nil,
+			SecretRef: &api.SecretEnvSource{
+				// The Secret to select from
+				LocalObjectReference: api.LocalObjectReference{
+					Name: s.maskedVariablesSecret.Name,
+				},
+				Optional: &optional,
+			},
+		},
+	}
 }
 
 func (s *executor) getCommandAndArgs(imageDefinition common.Image, command ...string) ([]string, []string) {
@@ -1574,6 +1626,39 @@ func (s *executor) setupCredentials(ctx context.Context) error {
 	}).Run()
 	return err
 }
+
+// Create a kubernetes secret to store masked environment variables and their values. The
+// secret is named using the project and job IDs.
+func (s *executor) setupMaskedVariablesSecret(ctx context.Context) error {
+	envVars := s.Build.GetAllVariables()
+
+	data := make(map[string][]byte)
+	for _, v := range envVars {
+		if v.Masked {
+			data[v.Key] = []byte(v.Value)
+		}
+	}
+	if len(data) == 0 {
+		return nil
+	}
+
+
+	secret := api.Secret{}
+	secret.Name = generateNameForK8sResources(s.Build.ProjectUniqueName())
+	secret.Namespace = s.configurationOverwrites.namespace
+	secret.Type = api.SecretTypeOpaque
+	secret.Data = data
+
+	kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
+		return s.requestSecretCreation(ctx, &secret, s.configurationOverwrites.namespace)
+	})
+	// requestSecretCreation returns an existing secret if there was one
+	var err error
+	s.maskedVariablesSecret, err = kubeRequest.RunValue()
+
+	return err
+}
+
 
 func (s *executor) requestSecretCreation(
 	ctx context.Context,
