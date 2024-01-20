@@ -65,6 +65,7 @@ type client struct {
 	lastUpdate      string
 	requestBackOffs map[string]*backoff.Backoff
 	lock            sync.Mutex
+	networkConfig   NetworkConfig
 
 	requester requester
 }
@@ -183,7 +184,7 @@ func (n *client) createTransport() {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Minute,
+		ResponseHeaderTimeout: n.networkConfig.ResponseHeaderTimeout,
 	}
 	n.Timeout = common.DefaultNetworkClientTimeout
 }
@@ -529,7 +530,7 @@ func (n *client) findCertificate(certificate *string, base string, name string) 
 	}
 }
 
-func newClient(requestCredentials requestCredentials) (*client, error) {
+func newClientWithConfig(requestCredentials requestCredentials, networkConfig NetworkConfig) (*client, error) {
 	url, err := url.Parse(fixCIURL(requestCredentials.GetURL()) + "/api/v4/")
 	if err != nil {
 		return nil, err
@@ -545,6 +546,7 @@ func newClient(requestCredentials requestCredentials) (*client, error) {
 		certFile:        requestCredentials.GetTLSCertFile(),
 		keyFile:         requestCredentials.GetTLSKeyFile(),
 		requestBackOffs: make(map[string]*backoff.Backoff),
+		networkConfig:   networkConfig,
 	}
 	c.requester = newRateLimitRequester(&c.Client)
 
@@ -556,4 +558,8 @@ func newClient(requestCredentials requestCredentials) (*client, error) {
 	}
 
 	return c, nil
+}
+
+func newClient(requestCredentials requestCredentials) (*client, error) {
+	return newClientWithConfig(requestCredentials, DefaultNetworkConfig())
 }

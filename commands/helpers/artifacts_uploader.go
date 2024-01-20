@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -25,6 +26,13 @@ const (
 	DefaultUploadName       = "default"
 	defaultTries            = 3
 	serviceUnavailableTries = 6
+
+	// Because Workhorse uploads the file to object storage and runs
+	// gitlab-zip-metadata to extract the ZIP metadata via HTTP Range Requests,
+	// it can take a while for the artifacts API to return a header once
+	// the body has been uploaded. Set the timeout to an hour (up from
+	// the default of 10 minutes) to ensure the upload won't be prematurely aborted.
+	artifactsResponseHeaderTimeout = 1 * time.Hour
 )
 
 var (
@@ -245,11 +253,14 @@ func (c *ArtifactsUploaderCommand) normalizeArgs() {
 }
 
 func init() {
+	networkConfig := network.NetworkConfig{
+		ResponseHeaderTimeout: artifactsResponseHeaderTimeout,
+	}
 	common.RegisterCommand2(
 		"artifacts-uploader",
 		"create and upload build artifacts (internal)",
 		&ArtifactsUploaderCommand{
-			network: network.NewGitLabClient(),
+			network: network.NewGitLabClientWithNetworkConfig(networkConfig),
 			Name:    "artifacts",
 		},
 	)

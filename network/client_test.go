@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jpillora/backoff"
 	"github.com/sirupsen/logrus"
@@ -125,6 +126,17 @@ func TestNewClient(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	assert.Equal(t, "http://test.example.com/api/v4/", c.url.String())
+	assert.Equal(t, defaultResponseHeaderTimeout, c.networkConfig.ResponseHeaderTimeout)
+}
+
+func TestNewClientWithNetworkConfig(t *testing.T) {
+	c := NewGitLabClientWithNetworkConfig(
+		NetworkConfig{
+			ResponseHeaderTimeout: 1 * time.Hour,
+		},
+	)
+	assert.NotNil(t, c)
+	assert.Equal(t, 1*time.Hour, c.networkConfig.ResponseHeaderTimeout)
 }
 
 func TestInvalidUrl(t *testing.T) {

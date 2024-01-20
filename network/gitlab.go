@@ -37,6 +37,7 @@ type GitLabClient struct {
 	clients map[string]*client
 	lock    sync.Mutex
 
+	networkConfig        NetworkConfig
 	apiRequestsCollector *APIRequestsCollector
 }
 
@@ -56,7 +57,7 @@ func (n *GitLabClient) getClient(credentials requestCredentials) (c *client, err
 	)
 	c = n.clients[key]
 	if c == nil {
-		c, err = newClient(credentials)
+		c, err = newClientWithConfig(credentials, n.networkConfig)
 		if err != nil {
 			return
 		}
@@ -1107,12 +1108,21 @@ func (n *GitLabClient) handleResponse(ctx context.Context, res *http.Response, d
 	}
 }
 
-func NewGitLabClientWithAPIRequestsCollector(c *APIRequestsCollector) *GitLabClient {
+func newGitlabClient(c *APIRequestsCollector, networkConfig NetworkConfig) *GitLabClient {
 	return &GitLabClient{
 		apiRequestsCollector: c,
+		networkConfig:        networkConfig,
 	}
 }
 
+func NewGitLabClientWithAPIRequestsCollector(c *APIRequestsCollector) *GitLabClient {
+	return newGitlabClient(c, DefaultNetworkConfig())
+}
+
+func NewGitLabClientWithNetworkConfig(networkConfig NetworkConfig) *GitLabClient {
+	return newGitlabClient(NewAPIRequestsCollector(), networkConfig)
+}
+
 func NewGitLabClient() *GitLabClient {
-	return NewGitLabClientWithAPIRequestsCollector(NewAPIRequestsCollector())
+	return newGitlabClient(NewAPIRequestsCollector(), DefaultNetworkConfig())
 }
