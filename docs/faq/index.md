@@ -69,7 +69,7 @@ to be protected in job log output, but not in container logs.
 
 From a terminal, logged in as root, run the following. 
 
-WARNING: 
+WARNING:
 This should not be performed on runners using [Shell executor](../executors/shell.md) as this will redefine the `systemd` service and all jobs will be running as root which poses security risks.
 
 ```shell
