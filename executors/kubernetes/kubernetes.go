@@ -1633,6 +1633,24 @@ func (s *executor) setupCredentials(ctx context.Context) error {
 	return err
 }
 
+// Helper for setupMaskedVariablesSecrets.
+func (s *executor) createSecretForMaskedVariable(ctx context.Context, data map[string][]byte) (*api.Secret, error) {
+	secret := api.Secret{}
+	secret.Name = generateNameForK8sResources(s.Build.ProjectUniqueName())
+	secret.Namespace = s.configurationOverwrites.namespace
+	secret.Type = api.SecretTypeOpaque
+	secret.Data = data
+
+	kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
+		return s.requestSecretCreation(ctx, &secret, s.configurationOverwrites.namespace)
+	})
+	newSecret, err := kubeRequest.RunValue()
+	if err != nil {
+		s.BuildLogger.Errorln(fmt.Sprintf("Error creating secret: %s", err.Error()))
+	}
+	return newSecret, err
+}
+
 // Create a kubernetes secret to store masked environment variables and their values. The
 // secret is named using the project and job IDs plus a unique string.
 func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
@@ -1641,23 +1659,6 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 	// of the keys and values, but it actually ends up being a json document with some
 	// overhead, so using ~90% of 1MiB...
 	const MAX_SECRET_SIZE = 1024 * 920
-
-	createSecret := func(data map[string][]byte) (*api.Secret, error) {
-		secret := api.Secret{}
-		secret.Name = generateNameForK8sResources(s.Build.ProjectUniqueName())
-		secret.Namespace = s.configurationOverwrites.namespace
-		secret.Type = api.SecretTypeOpaque
-		secret.Data = data
-
-		kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
-			return s.requestSecretCreation(ctx, &secret, s.configurationOverwrites.namespace)
-		})
-		newSecret, err := kubeRequest.RunValue()
-		if err != nil {
-			s.BuildLogger.Errorln(fmt.Sprintf("Error creating secret: %s", err.Error()))
-		}
-		return newSecret, err
-	}
 
 	envVars := s.Build.GetAllVariables()
 	secrets := make([]*api.Secret, 0)
@@ -1674,7 +1675,7 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 		if v.File {
 			secretData := make(map[string][]byte)
 			secretData[v.Key] = []byte(v.Value)
-			secret, err := createSecret(secretData)
+			secret, err := s.createSecretForMaskedVariable(ctx, secretData)
 			if err != nil {
 				return err
 			}
@@ -1692,7 +1693,7 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 
 		// This variable cannot be added to the current secret, it would be too big.
 		// Create a secret with the previous data.
-		secret, err := createSecret(secretData)
+		secret, err := s.createSecretForMaskedVariable(ctx, secretData)
 		if err != nil {
 			return err
 		}
@@ -1705,7 +1706,7 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 	}
 
 	if secretDataSize > 0 {
-		secret, err := createSecret(secretData)
+		secret, err := s.createSecretForMaskedVariable(ctx, secretData)
 		if err != nil {
 			return err
 		}
