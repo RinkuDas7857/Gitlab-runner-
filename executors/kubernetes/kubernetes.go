@@ -236,8 +236,8 @@ type executor struct {
 	options     *kubernetesOptions
 	services    []api.Service
 
-	// Masked job variables are saved in this secret and then included in build containers.
-	maskedVariablesSecret *api.Secret
+	// Masked job variables are saved in these secrets, then included in build containers.
+	maskedVariablesSecrets []*api.Secret
 
 	configurationOverwrites *overwrites
 	pullManager             pull.Manager
@@ -605,7 +605,7 @@ func (s *executor) setupPodLegacy(ctx context.Context) error {
 		return err
 	}
 
-	err = s.setupMaskedVariablesSecret(ctx)
+	err = s.setupMaskedVariablesSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("setting up secret: %w", err)
 	}
@@ -690,7 +690,7 @@ func (s *executor) ensurePodsConfigured(ctx context.Context) error {
 		return fmt.Errorf("setting up credentials: %w", err)
 	}
 
-	err = s.setupMaskedVariablesSecret(ctx)
+	err = s.setupMaskedVariablesSecrets(ctx)
 	if err != nil {
 		return fmt.Errorf("setting up secret: %w", err)
 	}
@@ -1065,12 +1065,15 @@ func (s *executor) cleanupResources() {
 		}
 	}
 
-	if s.maskedVariablesSecret != nil {
+	for _, secret := range s.maskedVariablesSecrets {
+		if len(secret.OwnerReferences) != 0 {
+			continue
+		}
 		kubeRequest := newRetryableKubeAPICall(func() error {
 			// kubeAPI: secrets, delete
 			return s.kubeClient.CoreV1().
 				Secrets(s.configurationOverwrites.namespace).
-				Delete(ctx, s.maskedVariablesSecret.Name, metav1.DeleteOptions{
+				Delete(ctx, secret.Name, metav1.DeleteOptions{
 					GracePeriodSeconds: s.Config.Kubernetes.GetCleanupGracePeriodSeconds(),
 				})
 		})
@@ -1151,7 +1154,7 @@ func (s *executor) buildContainer(opts containerBuildOpts) (api.Container, error
 		Command:         command,
 		Args:            args,
 		Env:             buildVariables(envVars),
-		EnvFrom:         s.envFromSecret(),
+		EnvFrom:         s.envFromSecrets(),
 		Resources: api.ResourceRequirements{
 			Limits:   opts.limits,
 			Requests: opts.requests,
@@ -1168,26 +1171,29 @@ func (s *executor) buildContainer(opts containerBuildOpts) (api.Container, error
 
 // Containers are configured with environment variables from masked secrets, which
 // are sourced from a single k8s secret whose name is taken from the project and job IDs.
-func (s *executor) envFromSecret() []api.EnvFromSource {
-	if s.maskedVariablesSecret == nil {
+func (s *executor) envFromSecrets() []api.EnvFromSource {
+	if len(s.maskedVariablesSecrets) == 0 {
 		return []api.EnvFromSource{}
 	}
 
+	// The secrets should certainly exist; make it a non-optinal source.
 	optional := false
 
-	return []api.EnvFromSource{
-		{
+	envFromSources := make([]api.EnvFromSource, len(s.maskedVariablesSecrets))
+	for i, secret := range s.maskedVariablesSecrets {
+		envFromSources[i] = api.EnvFromSource{
 			Prefix:       "",
 			ConfigMapRef: nil,
 			SecretRef: &api.SecretEnvSource{
 				// The Secret to select from
 				LocalObjectReference: api.LocalObjectReference{
-					Name: s.maskedVariablesSecret.Name,
+					Name: secret.Name,
 				},
 				Optional: &optional,
 			},
-		},
+		}
 	}
+	return envFromSources
 }
 
 func (s *executor) getCommandAndArgs(imageDefinition common.Image, command ...string) ([]string, []string) {
@@ -1628,34 +1634,86 @@ func (s *executor) setupCredentials(ctx context.Context) error {
 }
 
 // Create a kubernetes secret to store masked environment variables and their values. The
-// secret is named using the project and job IDs.
-func (s *executor) setupMaskedVariablesSecret(ctx context.Context) error {
-	envVars := s.Build.GetAllVariables()
+// secret is named using the project and job IDs plus a unique string.
+func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
+	// Create as many secrets as necessary to contain all environment variables. Each secret
+	// holds at most 1MiB of content data. This code assumes the secret size is just the sum
+	// of the keys and values, but it actually ends up being a json document with some
+	// overhead, so using ~90% of 1MiB...
+	const MAX_SECRET_SIZE = 1024 * 920
 
-	data := make(map[string][]byte)
-	for _, v := range envVars {
-		if v.Masked {
-			data[v.Key] = []byte(v.Value)
+	createSecret := func(data map[string][]byte) (*api.Secret, error) {
+		secret := api.Secret{}
+		secret.Name = generateNameForK8sResources(s.Build.ProjectUniqueName())
+		secret.Namespace = s.configurationOverwrites.namespace
+		secret.Type = api.SecretTypeOpaque
+		secret.Data = data
+
+		kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
+			return s.requestSecretCreation(ctx, &secret, s.configurationOverwrites.namespace)
+		})
+		newSecret, err := kubeRequest.RunValue()
+		if err != nil {
+			s.BuildLogger.Errorln(fmt.Sprintf("Error creating secret: %s", err.Error()))
 		}
-	}
-	if len(data) == 0 {
-		return nil
+		return newSecret, err
 	}
 
-	secret := api.Secret{}
-	secret.Name = generateNameForK8sResources(s.Build.ProjectUniqueName())
-	secret.Namespace = s.configurationOverwrites.namespace
-	secret.Type = api.SecretTypeOpaque
-	secret.Data = data
+	envVars := s.Build.GetAllVariables()
+	secrets := make([]*api.Secret, 0)
 
-	kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
-		return s.requestSecretCreation(ctx, &secret, s.configurationOverwrites.namespace)
-	})
-	// requestSecretCreation returns an existing secret if there was one
-	var err error
-	s.maskedVariablesSecret, err = kubeRequest.RunValue()
+	secretDataSize := 0
+	secretData := make(map[string][]byte)
 
-	return err
+	for _, v := range envVars {
+		if !v.Masked {
+			continue
+		}
+
+		// Each masked file-type variable goes in its own secret.
+		if v.File {
+			secretData := make(map[string][]byte)
+			secretData[v.Key] = []byte(v.Value)
+			secret, err := createSecret(secretData)
+			if err != nil {
+				return err
+			}
+			secrets = append(secrets, secret)
+			continue
+		}
+
+		// Check whether the current variable will fit in the current secret contents.
+		currentVariableSize := len(v.Key) + len(v.Value)
+		if secretDataSize+currentVariableSize < MAX_SECRET_SIZE {
+			secretData[v.Key] = []byte(v.Value)
+			secretDataSize += currentVariableSize
+			continue
+		}
+
+		// This variable cannot be added to the current secret, it would be too big.
+		// Create a secret with the previous data.
+		secret, err := createSecret(secretData)
+		if err != nil {
+			return err
+		}
+		secrets = append(secrets, secret)
+
+		// Begin the next secret.
+		secretData = make(map[string][]byte)
+		secretData[v.Key] = []byte(v.Value)
+		secretDataSize = currentVariableSize
+	}
+
+	if secretDataSize > 0 {
+		secret, err := createSecret(secretData)
+		if err != nil {
+			return err
+		}
+		secrets = append(secrets, secret)
+	}
+
+	s.maskedVariablesSecrets = secrets
+	return nil
 }
 
 func (s *executor) requestSecretCreation(
@@ -2112,7 +2170,29 @@ func (s *executor) setOwnerReferencesForResources(ctx context.Context, ownerRefe
 			Update(ctx, credentials, metav1.UpdateOptions{})
 	}).Run()
 
-	return err
+	var err error
+	s.credentials, err = kubeRequest.RunValue()
+	if err != nil {
+		return err
+	}
+
+	for i, secret := range s.maskedVariablesSecrets {
+		kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
+			scrt := secret.DeepCopy()
+			scrt.SetOwnerReferences(ownerReferences)
+
+			// kubeAPI: secrets, update
+			return s.kubeClient.CoreV1().
+				Secrets(s.configurationOverwrites.namespace).
+				Update(ctx, scrt, metav1.UpdateOptions{})
+		})
+		scrt, err := kubeRequest.RunValue()
+		if err != nil {
+			return err
+		}
+		s.maskedVariablesSecrets[i] = scrt
+	}
+	return nil
 }
 
 func (s *executor) buildPodReferences() []metav1.OwnerReference {
