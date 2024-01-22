@@ -1177,7 +1177,7 @@ func (s *executor) envFromSecret() []api.EnvFromSource {
 
 	return []api.EnvFromSource{
 		{
-			Prefix: "",
+			Prefix:       "",
 			ConfigMapRef: nil,
 			SecretRef: &api.SecretEnvSource{
 				// The Secret to select from
@@ -1642,7 +1642,6 @@ func (s *executor) setupMaskedVariablesSecret(ctx context.Context) error {
 		return nil
 	}
 
-
 	secret := api.Secret{}
 	secret.Name = generateNameForK8sResources(s.Build.ProjectUniqueName())
 	secret.Namespace = s.configurationOverwrites.namespace
@@ -1658,7 +1657,6 @@ func (s *executor) setupMaskedVariablesSecret(ctx context.Context) error {
 
 	return err
 }
-
 
 func (s *executor) requestSecretCreation(
 	ctx context.Context,
