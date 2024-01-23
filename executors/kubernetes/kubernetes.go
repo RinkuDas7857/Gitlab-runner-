@@ -1662,7 +1662,6 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 
 	envVars := s.Build.GetAllVariables()
 	secrets := make([]*api.Secret, 0)
-
 	secretDataSize := 0
 	secretData := make(map[string][]byte)
 
