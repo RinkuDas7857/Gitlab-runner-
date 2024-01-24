@@ -16,7 +16,6 @@ import (
 
 type Client struct {
 	Config
-
 	ConnectRetries int
 
 	client *ssh.Client
