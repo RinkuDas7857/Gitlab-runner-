@@ -424,10 +424,6 @@ func (c *clientJobTrace) setupLogLimit() {
 	c.buffer.SetLimit(bytesLimit)
 }
 
-func (c *clientJobTrace) IsMaskingURLParams() bool {
-	return c.config.IsFeatureFlagOn(featureflags.UseImprovedURLMasking)
-}
-
 func (c *clientJobTrace) SetDebugModeEnabled(isEnabled bool) {
 	c.debugModeEnabled = isEnabled
 }
