@@ -17,8 +17,6 @@ import (
 type Client struct {
 	Config
 
-	Stdout         io.Writer
-	Stderr         io.Writer
 	ConnectRetries int
 
 	client *ssh.Client
@@ -27,6 +25,8 @@ type Client struct {
 type Command struct {
 	Command string
 	Stdin   string
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 type ExitError struct {
@@ -137,22 +137,6 @@ func (s *Client) Connect() error {
 	return finalError
 }
 
-func (s *Client) Exec(cmd string) error {
-	if s.client == nil {
-		return errors.New("not connected")
-	}
-
-	session, err := s.client.NewSession()
-	if err != nil {
-		return err
-	}
-	session.Stdout = s.Stdout
-	session.Stderr = s.Stderr
-	err = session.Run(cmd)
-	_ = session.Close()
-	return err
-}
-
 func (s *Client) Run(ctx context.Context, cmd Command) error {
 	if s.client == nil {
 		return errors.New("not connected")
@@ -165,8 +149,8 @@ func (s *Client) Run(ctx context.Context, cmd Command) error {
 	defer func() { _ = session.Close() }()
 
 	session.Stdin = strings.NewReader(cmd.Stdin)
-	session.Stdout = s.Stdout
-	session.Stderr = s.Stderr
+	session.Stdout = cmd.Stdout
+	session.Stderr = cmd.Stderr
 	err = session.Start(cmd.Command)
 	if err != nil {
 		return err
