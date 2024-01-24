@@ -882,7 +882,6 @@ type JobTrace interface {
 	Abort() bool
 	SetFailuresCollector(fc FailuresCollector)
 	SetSupportedFailureReasonMapper(f SupportedFailureReasonMapper)
-	SetMasked(maskOptions MaskOptions)
 	SetDebugModeEnabled(isEnabled bool)
 	IsStdout() bool
 }

@@ -70,10 +70,6 @@ func (c *clientJobTrace) Write(data []byte) (n int, err error) {
 	return c.buffer.Write(data)
 }
 
-func (c *clientJobTrace) SetMasked(opts common.MaskOptions) {
-	c.buffer.SetMasked(opts)
-}
-
 func (c *clientJobTrace) checksum() string {
 	return c.buffer.Checksum()
 }
@@ -441,7 +437,7 @@ func newJobTrace(
 	config common.RunnerConfig,
 	jobCredentials *common.JobCredentials,
 ) (*clientJobTrace, error) {
-	buffer, err := trace.New(trace.WithURLParamMasking(config.IsFeatureFlagOn(featureflags.UseImprovedURLMasking)))
+	buffer, err := trace.New()
 	if err != nil {
 		return nil, err
 	}
