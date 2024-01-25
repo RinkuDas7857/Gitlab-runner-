@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	RegistryImage    = env.NewDefault("CI_REGISTRY_IMAGE", fmt.Sprintf("registry.gitlab.com/gitlab-org/%s", build.AppName))
-	Registry         = env.NewDefault("CI_REGISTRY", "registry.gitlab.com")
+	RegistryImage    = env.NewDefault("CI_REGISTRY_IMAGE", fmt.Sprintf("gitlab/%s", build.AppName))
+	Registry         = env.New("CI_REGISTRY")
 	RegistryUser     = env.New("CI_REGISTRY_USER")
 	RegistryPassword = env.New("CI_REGISTRY_PASSWORD")
 

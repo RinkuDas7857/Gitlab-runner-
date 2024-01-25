@@ -131,15 +131,30 @@ func (b helperBlueprintImpl) Data() []helperBuild {
 	return b.data
 }
 
-func AssembleReleaseHelper(flavor, prefix string) build.TargetBlueprint[build.Component, build.Component, []helperBuild] {
+func AssembleReleaseHelper(flavor, prefix, arch string) build.TargetBlueprint[build.Component, build.Component, []helperBuild] {
 	var archs []string
-	switch flavor {
-	case "ubi-fips":
-		archs = []string{"x86_64"}
-	case "alpine-edge":
-		archs = []string{"x86_64", "arm", "arm64", "s390x", "ppc64le", "riscv64"}
-	default:
-		archs = []string{"x86_64", "arm", "arm64", "s390x", "ppc64le"}
+
+	if arch != "" {
+		archs = []string{arch}
+	} else {
+		switch flavor {
+		case "ubi-fips":
+			archs = []string{"x86_64"}
+		case "alpine-edge":
+			archs = []string{"x86_64", "arm", "arm64", "s390x", "ppc64le", "riscv64"}
+		default:
+			archs = []string{"x86_64", "arm", "arm64", "s390x", "ppc64le"}
+		}
+	}
+
+	// By default, we add a dash to the flavor e.g. `alpine` -> `alpine-`.
+	// The `default` value is needed for when we want to build the default flavor image.
+	if prefix == "" {
+		prefix = flavor + "-"
+	}
+
+	if prefix == "default" {
+		prefix = ""
 	}
 
 	builds := helperBlueprintImpl{

@@ -129,11 +129,11 @@ Be sure to configure Rancher Desktop to use `dockerd (moby)` and not `containerd
 ## 4. Install GitLab Runner dependencies
 
 ```shell
-make deps
+make deps mage
 asdf reshim
 ```
 
-**For FreeBSD use `gmake deps`**
+**For FreeBSD use `gmake deps mage`**
 
 ## 5. Build GitLab Runner
 
@@ -166,7 +166,7 @@ If you want to build the Docker images, run `make runner-and-helper-docker-host`
 1. Compile GitLab Runner for `linux/amd64`.
 1. Build a DEB package for Runner. The official GitLab Runner images are based on Alpine and Ubuntu,
    and the Ubuntu image build uses the DEB package.
-1. Build the Alpine and Ubuntu versions of the `gitlab/gitlab-runner` image.
+1. Build the `alpine:latest` version of the `gitlab/gitlab-runner` and `gitlab/gitlab-runner-helper` image.
 
 ### New auto-scaling (Taskscaler) in GitLab Runner (since 15.6.0)
 

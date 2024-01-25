@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -18,6 +19,11 @@ func (Images) BuildRunnerDefault() error {
 	return runRunnerBuild(images.DefaultFlavor, images.DefaultArchs, false)
 }
 
+// BuildRunnerHostArch builds gitlab-runner images for the host arch without pushing the resulting tags
+func (Images) BuildRunnerHostArch(flavor string) error {
+	return runRunnerBuild(flavor, runtime.GOARCH, false)
+}
+
 // BuildRunner builds gitlab-runner images for the specified flavor and target archs without pushing the resulting tags
 func (Images) BuildRunner(flavor, targetArchs string) error {
 	return runRunnerBuild(flavor, targetArchs, false)
@@ -27,6 +33,11 @@ func (Images) BuildRunner(flavor, targetArchs string) error {
 // tags to the configured repository
 func (Images) ReleaseRunner(flavor, targetArchs string) error {
 	return runRunnerBuild(flavor, targetArchs, true)
+}
+
+// ReleaseRunnerHostArch builds gitlab-runner images for the host arch and pushes the resulting tags to the configured repository
+func (Images) ReleaseRunnerHostArch(flavor string) error {
+	return runRunnerBuild(flavor, runtime.GOARCH, true)
 }
 
 func runRunnerBuild(flavor, targetArchs string, publish bool) error {
@@ -43,26 +54,25 @@ func runRunnerBuild(flavor, targetArchs string, publish bool) error {
 	return images.BuildRunner(blueprint, publish)
 }
 
-// TagHelperDefault generates gitlab-runner-helper images tags from already generated image archives
-// without pushing the resulting tags
-func (Images) TagHelperDefault() error {
-	return runHelperBuild(images.DefaultFlavor, "", false)
+// TagHelperHostArch generates gitlab-runner-helper images tags for the specified flavor and host arch
+func (Images) TagHelperHostArch(flavor string) error {
+	return runHelperBuild(flavor, "", runtime.GOARCH, false)
 }
 
-// TagHelper generates gitlab-runner-helper images tags from already generated image archives for the specified flavor and prefix
-// without pushing the resulting tags
-func (Images) TagHelper(flavor, prefix string) error {
-	return runHelperBuild(flavor, prefix, false)
+// ReleaseHelper generates gitlab-runner-helper images tags from already generated image archives for the specified flavor.
+// Prefix is automatically generated. The resulting tags are pushed to the configured repository
+func (Images) ReleaseHelper(flavor string) error {
+	return runHelperBuild(flavor, "", "", true)
 }
 
-// ReleaseHelper generates gitlab-runner-helper images tags from already generated image archives for the specified flavor and prefix
+// ReleaseHelperPrefix generates gitlab-runner-helper images tags from already generated image archives for the specified flavor and prefix
 // and pushes the resulting tags to the configured repository
-func (Images) ReleaseHelper(flavor, prefix string) error {
-	return runHelperBuild(flavor, prefix, true)
+func (Images) ReleaseHelperPrefix(flavor, prefix string) error {
+	return runHelperBuild(flavor, prefix, "", true)
 }
 
-func runHelperBuild(flavor, prefix string, publish bool) error {
-	blueprint, err := build.PrintBlueprint(images.AssembleReleaseHelper(flavor, prefix))
+func runHelperBuild(flavor, prefix, arch string, publish bool) error {
+	blueprint, err := build.PrintBlueprint(images.AssembleReleaseHelper(flavor, prefix, arch))
 	if err != nil {
 		return err
 	}

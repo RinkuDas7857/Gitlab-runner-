@@ -152,10 +152,7 @@ _helper-dockerarchive-host: ${BASE_TAR_PATH}-$(IMAGE_TARGET_FLAVOUR)-$(shell una
 
 .PHONY: helper-dockerarchive-host
 helper-dockerarchive-host:
-	@$(MAKE) _helper-dockerarchive-host IMAGE_TARGET_FLAVOUR='alpine' IMAGE_VARIANT_PREFIX='' IMAGE_VARIANT_SUFFIX=''
-	@$(MAKE) _helper-dockerarchive-host IMAGE_TARGET_FLAVOUR='alpine' IMAGE_VARIANT_PREFIX='' IMAGE_VARIANT_SUFFIX='-pwsh'
-	@$(MAKE) _helper-dockerarchive-host IMAGE_TARGET_FLAVOUR='ubuntu' IMAGE_VARIANT_PREFIX='ubuntu-' IMAGE_VARIANT_SUFFIX=''
-	@$(MAKE) _helper-dockerarchive-host IMAGE_TARGET_FLAVOUR='ubuntu' IMAGE_VARIANT_PREFIX='ubuntu-' IMAGE_VARIANT_SUFFIX='-pwsh'
+	@$(MAKE) _helper-dockerarchive-host IMAGE_TARGET_FLAVOUR='alpine-latest' IMAGE_VARIANT_PREFIX='' IMAGE_VARIANT_SUFFIX=''
 
 # Build the Runner Helper tar files for all supported platforms.
 .PHONY: helper-dockerarchive

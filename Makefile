@@ -241,10 +241,6 @@ prepare_index: $(RELEASE_INDEX_GENERATOR)
 								-gpg-key-env GPG_KEY \
 								-gpg-password-env GPG_PASSPHRASE
 
-release_docker_images:
-	# Releasing GitLab Runner images
-	@./ci/release_docker_images
-
 test_go_scripts: export LIST ?= sync-docker-images
 test_go_scripts:
 	cd scripts && for file in $$(find . -name "*_test.go"); do \
