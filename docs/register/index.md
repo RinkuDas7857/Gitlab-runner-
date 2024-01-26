@@ -16,6 +16,7 @@ DETAILS:
 > - [Introduced](https://gitlab.com/gitlab-org/gitlab-runner/-/merge_requests/3414) in GitLab Runner 15.0, a change to the registration request format prevents the GitLab Runner from communicating with GitLab 14.7 and earlier. You must use a GitLab Runner version that is appropriate for the GitLab version, or upgrade the GitLab application.
 
 Runner registration is the process that links the runner with one or more GitLab instances. You must register the runner so that it can pick up jobs from the GitLab instance.
+After you register the runner, the runner configuration is saved as a `[[runner]]` entry in the `config.toml`.
 
 ## Requirements
 
@@ -36,8 +37,6 @@ Prerequisites:
     [group](https://docs.gitlab.com/ee/ci/runners/runners_scope.html#create-a-group-runner-with-a-runner-authentication-token), or
     [project](https://docs.gitlab.com/ee/ci/runners/runners_scope.html#create-a-project-runner-with-a-runner-authentication-token) runner.
   - Locate the runner authentication token in the `config.toml` file. Runner authentication tokens have the prefix, `glrt-`.
-
-After you register the runner, the configuration is saved to the `config.toml`.
 
 To register the runner with a [runner authentication token](https://docs.gitlab.com/ee/security/token_overview.html#runner-authentication-tokens):
 
