@@ -5,7 +5,7 @@ ARG DUMB_INIT_VERSION
 ARG PACKAGE_ARCH
 ARG TARGET_FLAVOR
 ARG SHORT_TARGET_FLAVOR_IMAGE_VERSION
-ADD https://gitlab.com/api/v4/projects/52695599/packages/generic/${TARGET_FLAVOR}_${SHORT_TARGET_FLAVOR_IMAGE_VERSION}/0/dumb-init_${DUMB_INIT_VERSION}_p0_${PACKAGE_ARCH}.apk dumb-init.apk
+ADD https://gitlab.com/api/v4/projects/52695599/packages/generic/${TARGET_FLAVOR}-${SHORT_TARGET_FLAVOR_IMAGE_VERSION}/0/dumb-init_${DUMB_INIT_VERSION}_p0_${PACKAGE_ARCH}.apk dumb-init.apk
 RUN apk add --allow-untrusted ./dumb-init.apk
 
 # gitlab-runner-helper will try to resolve `sh` from the path. We ensure the PATH is populated by default, as some container runtimes do no longer set a default (e.g. containerd v1.2.8)
