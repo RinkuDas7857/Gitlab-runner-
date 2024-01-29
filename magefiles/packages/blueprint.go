@@ -195,13 +195,9 @@ func prebuiltImages(t Type, archFilter string) []string {
 		"ubuntu-x86_64.tar.xz",
 	}
 
-	if archFilter != "" {
+	if t == DebSlim || t == RpmSlim {
 		suffixes = lo.Filter(suffixes, func(s string, _ int) bool {
-			if t == DebSlim || t == RpmSlim {
-				return strings.Contains(s, archFilter) && strings.Contains(s, "alpine")
-			}
-
-			return strings.Contains(s, archFilter)
+			return strings.Contains(s, archFilter) && strings.Contains(s, "alpine")
 		})
 	}
 
