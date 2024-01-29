@@ -10,12 +10,6 @@ import (
 
 type Type string
 
-const (
-	Deb     Type = "deb"
-	Rpm     Type = "rpm"
-	RpmFips Type = "rpm-fips"
-)
-
 // Create creates a package based on the type
 func Create(blueprint Blueprint) error {
 	var opts []string

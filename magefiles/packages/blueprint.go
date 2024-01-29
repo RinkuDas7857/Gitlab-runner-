@@ -10,11 +10,40 @@ import (
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/env"
 )
 
+const (
+	Deb     Type = "deb"
+	DebSlim Type = "deb-slim"
+	Rpm     Type = "rpm"
+	RpmSlim Type = "rpm-slim"
+	RpmFips Type = "rpm-fips"
+)
+
 var (
 	gPGKeyID      = env.New("GPG_KEYID")
 	gPGPassphrase = env.New("GPG_PASSPHRASE")
 	iteration     = env.New(iterationVar)
 )
+
+// translatePackageType translates various package types into their bare type which can then be passed
+// to fpm to create the package.
+func translatePackageType(p Type) Type {
+	switch p {
+	case DebSlim:
+		return Deb
+	case RpmSlim, RpmFips:
+		return Rpm
+	default:
+		return p
+	}
+}
+
+func postfix(p Type) string {
+	if p == RpmFips {
+		return "-fips"
+	}
+
+	return ""
+}
 
 type Blueprint = build.TargetBlueprint[build.Component, build.Component, blueprintParams]
 
@@ -74,22 +103,17 @@ func (b blueprintImpl) Data() blueprintParams {
 func Assemble(pkgType Type, arch, packageArch string) Blueprint {
 	base := build.NewBlueprintBase(gPGKeyID, gPGPassphrase, iteration)
 
-	var postfix string
-	if pkgType == RpmFips {
-		pkgType = Rpm
-		postfix = "-fips"
-	}
 	runnerBinary := fmt.Sprintf("out/binaries/%s-linux-%s", build.AppName, arch)
 
 	pkgName := build.AppName
-	pkgFile := fmt.Sprintf("out/%s/%s_%s%s.%s", pkgType, pkgName, packageArch, postfix, pkgType)
+	pkgFile := fmt.Sprintf("out/%s/%s_%s%s.%s", pkgType, pkgName, packageArch, postfix(pkgType), pkgType)
 
-	prebuiltImages := prebuiltImages(pkgType)
+	prebuiltImages := prebuiltImages(pkgType, arch)
 
 	params := blueprintParams{
-		pkgType:        pkgType,
+		pkgType:        translatePackageType(pkgType),
 		packageArch:    packageArch,
-		postfix:        postfix,
+		postfix:        postfix(pkgType),
 		runnerBinary:   runnerBinary,
 		pkgFile:        pkgFile,
 		prebuiltImages: prebuiltImages,
@@ -140,7 +164,7 @@ func assembleDependencies(p blueprintParams, env build.BlueprintEnv) ([]string, 
 	return fileDependencies, binaryDependencies, imagesDependencies, macosDependencies
 }
 
-func prebuiltImages(t Type) []string {
+func prebuiltImages(t Type, archFilter string) []string {
 	const (
 		baseHelperInputPart  = "out/helper-images/prebuilt-"
 		baseHelperOutputPart = "/usr/lib/gitlab-runner/helper-images/prebuilt-"
@@ -150,6 +174,10 @@ func prebuiltImages(t Type) []string {
 		return []string{
 			fmt.Sprintf("%subi-fips-x86_64.tar.xz=%subi-fips-x86_64.tar.xz", baseHelperInputPart, baseHelperOutputPart),
 		}
+	}
+
+	if archFilter == "amd64" {
+		archFilter = "x86_64"
 	}
 
 	suffixes := []string{
@@ -165,6 +193,16 @@ func prebuiltImages(t Type) []string {
 		"ubuntu-s390x.tar.xz",
 		"ubuntu-x86_64-pwsh.tar.xz",
 		"ubuntu-x86_64.tar.xz",
+	}
+
+	if archFilter != "" {
+		suffixes = lo.Filter(suffixes, func(s string, _ int) bool {
+			if t == DebSlim || t == RpmSlim {
+				return strings.Contains(s, archFilter) && strings.Contains(s, "alpine")
+			}
+
+			return strings.Contains(s, archFilter)
+		})
 	}
 
 	return lo.Map(suffixes, func(s string, _ int) string {

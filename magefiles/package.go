@@ -23,9 +23,19 @@ func (p Package) Deb(arch, packageArch string) error {
 	return p.createPackage(packages.Deb, arch, packageArch)
 }
 
+// DebSlim builds deb package while bundling only the alpine helper image archive for the specified architecture
+func (p Package) DebSlim(arch, packageArch string) error {
+	return p.createPackage(packages.DebSlim, arch, packageArch)
+}
+
 // Rpm builds rpm package
 func (p Package) Rpm(arch, packageArch string) error {
 	return p.createPackage(packages.Rpm, arch, packageArch)
+}
+
+// RpmSlim builds rpm package while bundling only the alpine helper image archive for the specified architecture
+func (p Package) RpmSlim(arch, packageArch string) error {
+	return p.createPackage(packages.RpmSlim, arch, packageArch)
 }
 
 // RpmFips builds rpm package for fips
