@@ -96,7 +96,7 @@ should have access to it, or if you want to limit it to a specific GitLab group 
 
 There are three types of runners, based on who you want to have access:
 
-- [Shared runners](https://docs.gitlab.com/ee/ci/runners/runners_scope.html#shared-runners) are for use by all projects
+- [Instance runners](https://docs.gitlab.com/ee/ci/runners/runners_scope.html#shared-runners) are for use by all projects
 - [Group runners](https://docs.gitlab.com/ee/ci/runners/runners_scope.html#group-runners) are for all projects and subgroups in a group
 - [Project runners](https://docs.gitlab.com/ee/ci/runners/runners_scope.html#project-runners) are for individual projects
 
