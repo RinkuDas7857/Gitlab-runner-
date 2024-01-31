@@ -1069,7 +1069,7 @@ func (s *executor) cleanupResources() {
 		if len(secret.OwnerReferences) != 0 {
 			continue
 		}
-		kubeRequest := newRetryableKubeAPICall(func() error {
+		kubeRequest := retry.WithFn(s, func() error {
 			// kubeAPI: secrets, delete
 			return s.kubeClient.CoreV1().
 				Secrets(s.configurationOverwrites.namespace).
@@ -1641,10 +1641,9 @@ func (s *executor) createSecretForMaskedVariable(ctx context.Context, data map[s
 	secret.Type = api.SecretTypeOpaque
 	secret.Data = data
 
-	kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
+	newSecret, err := retry.WithValueFn(s, func() (*api.Secret, error) {
 		return s.requestSecretCreation(ctx, &secret, s.configurationOverwrites.namespace)
-	})
-	newSecret, err := kubeRequest.RunValue()
+	}).Run()
 	if err != nil {
 		s.BuildLogger.Errorln(fmt.Sprintf("Error creating secret: %s", err.Error()))
 	}
@@ -2170,14 +2169,12 @@ func (s *executor) setOwnerReferencesForResources(ctx context.Context, ownerRefe
 			Update(ctx, credentials, metav1.UpdateOptions{})
 	}).Run()
 
-	var err error
-	s.credentials, err = kubeRequest.RunValue()
 	if err != nil {
 		return err
 	}
 
 	for i, secret := range s.maskedVariablesSecrets {
-		kubeRequest := newRetryableKubeAPICallWithValue(func() (*api.Secret, error) {
+		scrt, err := retry.WithValueFn(s, func() (*api.Secret, error) {
 			scrt := secret.DeepCopy()
 			scrt.SetOwnerReferences(ownerReferences)
 
@@ -2185,8 +2182,7 @@ func (s *executor) setOwnerReferencesForResources(ctx context.Context, ownerRefe
 			return s.kubeClient.CoreV1().
 				Secrets(s.configurationOverwrites.namespace).
 				Update(ctx, scrt, metav1.UpdateOptions{})
-		})
-		scrt, err := kubeRequest.RunValue()
+		}).Run()
 		if err != nil {
 			return err
 		}
