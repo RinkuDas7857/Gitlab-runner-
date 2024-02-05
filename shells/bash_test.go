@@ -3,6 +3,8 @@
 package shells
 
 import (
+	"context"
+	"fmt"
 	"path"
 	"runtime"
 	"testing"
@@ -236,5 +238,60 @@ func Test_BashWriter_Variable(t *testing.T) {
 			tt.writer.Variable(tt.variable)
 			assert.Equal(t, tt.want, tt.writer.String())
 		})
+	}
+}
+
+func BenchmarkBashGenerateScript(b *testing.B) {
+	shell := &BashShell{Shell: "Bash"}
+	build := &common.Build{
+		CacheDir: b.TempDir(),
+		Runner: &common.RunnerConfig{
+			RunnerCredentials: common.RunnerCredentials{URL: "https://internal"},
+		},
+		JobResponse: common.JobResponse{
+			Steps: []common.Step{
+				{Name: "script", Script: []string{"echo hello world"}},
+				{Name: "after_script", Script: []string{"echo hello world"}},
+			},
+			Cache: common.Caches{
+				common.Cache{Key: "key", Paths: []string{"path"}, When: "always"},
+			},
+			GitInfo: common.GitInfo{Ref: "abcdefgh", Sha: "00000000"},
+			Dependencies: common.Dependencies{
+				common.Dependency{ID: 1, Name: "artifact", ArtifactsFile: common.DependencyArtifactsFile{Filename: "name"}},
+			},
+			Artifacts: common.Artifacts{
+				common.Artifact{Name: "artifact", Paths: []string{"path"}, When: "always"},
+			},
+			Variables: common.JobVariables{
+				common.JobVariable{Key: "file", Value: "file", File: true},
+				common.JobVariable{Key: "FF_POSIXLY_CORRECT_ESCAPES", Value: "true"},
+			},
+		}}
+
+	stages := []common.BuildStage{
+		common.BuildStagePrepare,
+		common.BuildStageGetSources,
+		common.BuildStageRestoreCache,
+		common.BuildStageDownloadArtifacts,
+		common.BuildStageAfterScript,
+		common.BuildStageArchiveOnSuccessCache,
+		common.BuildStageArchiveOnFailureCache,
+		common.BuildStageUploadOnSuccessArtifacts,
+		common.BuildStageUploadOnFailureArtifacts,
+		common.BuildStageCleanup,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for n := 0; n < b.N; n++ {
+		for _, stage := range stages {
+			_, err := shell.GenerateScript(context.Background(), stage, common.ShellScriptInfo{Build: build})
+			if err != nil {
+				err = fmt.Errorf("%s: %w", stage, err)
+			}
+			require.NoError(b, err)
+		}
 	}
 }

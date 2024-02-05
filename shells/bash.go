@@ -112,11 +112,21 @@ func (b *BashWriter) GetTemporaryPath() string {
 }
 
 func (b *BashWriter) Line(text string) {
-	b.WriteString(strings.Repeat("  ", b.indent) + text + "\n")
+	b.WriteString(strings.Repeat("  ", b.indent))
+	b.WriteString(text)
+	b.WriteString("\n")
 }
 
-func (b *BashWriter) Linef(format string, arguments ...interface{}) {
-	b.Line(fmt.Sprintf(format, arguments...))
+func (b *BashWriter) line(args ...string) {
+	b.WriteString(strings.Repeat("  ", b.indent))
+	for num, arg := range args {
+		if num > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(arg)
+	}
+
+	b.WriteString("\n")
 }
 
 func (b *BashWriter) CheckForErrors() {
@@ -146,15 +156,21 @@ func (b *BashWriter) CommandArgExpand(command string, arguments ...string) {
 }
 
 func (b *BashWriter) buildCommand(quoter stringQuoter, command string, arguments ...string) string {
-	list := []string{
-		b.escape(command),
+	var sb strings.Builder
+
+	sb.WriteString(b.escape(command))
+	if len(arguments) > 0 {
+		sb.WriteByte(' ')
 	}
 
-	for _, argument := range arguments {
-		list = append(list, quoter(argument))
+	for num, argument := range arguments {
+		if num > 0 {
+			sb.WriteByte(' ')
+		}
+		sb.WriteString(quoter(argument))
 	}
 
-	return strings.Join(list, " ")
+	return sb.String()
 }
 
 func (b *BashWriter) TmpFile(name string) string {
@@ -166,7 +182,7 @@ func (b *BashWriter) cleanPath(name string) string {
 }
 
 func (b *BashWriter) EnvVariableKey(name string) string {
-	return fmt.Sprintf("$%s", name)
+	return "$" + name
 }
 
 // Intended to be used on unmodified paths only (i.e. paths that have not been
@@ -177,45 +193,47 @@ func (b *BashWriter) isTmpFile(path string) bool {
 
 func (b *BashWriter) Variable(variable common.JobVariable) {
 	if variable.File {
-		variableFile := b.TmpFile(variable.Key)
-		b.Linef("mkdir -p %q", helpers.ToSlash(b.TemporaryPath))
-		b.Linef("printf '%%s' %s > %q", b.escape(variable.Value), variableFile)
-		b.Linef("export %s=%q", b.escape(variable.Key), variableFile)
+		variableFile := strconv.Quote(b.TmpFile(variable.Key))
+		b.line("mkdir -p", strconv.Quote(helpers.ToSlash(b.TemporaryPath)))
+		b.line("printf '%s'", b.escape(variable.Value), ">", variableFile)
+		b.line("export", b.escape(variable.Key)+"="+variableFile)
 	} else {
 		if b.isTmpFile(variable.Value) {
 			variable.Value = b.cleanPath(variable.Value)
 		}
-		b.Linef("export %s=%s", b.escape(variable.Key), b.escape(variable.Value))
+		b.line("export", b.escape(variable.Key)+"="+b.escape(variable.Value))
 	}
 }
 
 func (b *BashWriter) SourceEnv(pathname string) {
-	b.Linef("mkdir -p %q", helpers.ToSlash(b.TemporaryPath))
-	b.Linef("touch %q", pathname)
-	b.Linef("set -o allexport")
-	b.Linef("source %q set", pathname)
-	b.Linef("set +o allexport")
+	pathname = strconv.Quote(pathname)
+
+	b.line("mkdir -p", strconv.Quote(helpers.ToSlash(b.TemporaryPath)))
+	b.line("touch", pathname)
+	b.line("set -o allexport")
+	b.line("source", pathname, "set")
+	b.line("set +o allexport")
 }
 
 func (b *BashWriter) IfDirectory(path string) {
-	b.Linef("if [ -d %q ]; then", path)
+	b.line("if [ -d", strconv.Quote(path), "]; then")
 	b.Indent()
 }
 
 func (b *BashWriter) IfFile(path string) {
-	b.Linef("if [ -e %q ]; then", path)
+	b.line("if [ -e", strconv.Quote(path), "]; then")
 	b.Indent()
 }
 
 func (b *BashWriter) IfCmd(cmd string, arguments ...string) {
 	cmdline := b.buildCommand(b.escapeNoLegacy, cmd, arguments...)
-	b.Linef("if %s >/dev/null 2>&1; then", cmdline)
+	b.line("if", cmdline, ">/dev/null 2>&1; then")
 	b.Indent()
 }
 
 func (b *BashWriter) IfCmdWithOutput(cmd string, arguments ...string) {
 	cmdline := b.buildCommand(b.escapeNoLegacy, cmd, arguments...)
-	b.Linef("if %s; then", cmdline)
+	b.line("if", cmdline, "; then")
 	b.Indent()
 }
 
@@ -261,7 +279,7 @@ func (b *BashWriter) RmFile(path string) {
 func (b *BashWriter) RmFilesRecursive(path string, name string) {
 	b.IfDirectory(path)
 	// `find -delete` is not portable; https://unix.stackexchange.com/a/194348
-	b.Linef("find %q -name %q -exec rm {} +", path, name)
+	b.line("find", strconv.Quote(path), "-name", strconv.Quote(name), "-exec rm {} +")
 	b.EndIf()
 }
 
@@ -278,22 +296,22 @@ func (b *BashWriter) Join(elem ...string) string {
 
 func (b *BashWriter) Printf(format string, arguments ...interface{}) {
 	coloredText := helpers.ANSI_RESET + fmt.Sprintf(format, arguments...)
-	b.Line("echo " + b.escape(coloredText))
+	b.line("echo", b.escape(coloredText))
 }
 
 func (b *BashWriter) Noticef(format string, arguments ...interface{}) {
 	coloredText := helpers.ANSI_BOLD_GREEN + fmt.Sprintf(format, arguments...) + helpers.ANSI_RESET
-	b.Line("echo " + b.escape(coloredText))
+	b.line("echo", b.escape(coloredText))
 }
 
 func (b *BashWriter) Warningf(format string, arguments ...interface{}) {
 	coloredText := helpers.ANSI_YELLOW + fmt.Sprintf(format, arguments...) + helpers.ANSI_RESET
-	b.Line("echo " + b.escape(coloredText))
+	b.line("echo", b.escape(coloredText))
 }
 
 func (b *BashWriter) Errorf(format string, arguments ...interface{}) {
 	coloredText := helpers.ANSI_BOLD_RED + fmt.Sprintf(format, arguments...) + helpers.ANSI_RESET
-	b.Line("echo " + b.escape(coloredText))
+	b.line("echo", b.escape(coloredText))
 }
 
 func (b *BashWriter) EmptyLine() {
@@ -442,9 +460,9 @@ func (b *BashShell) GenerateSaveScript(info common.ShellScriptInfo, scriptPath, 
 }
 
 func (b *BashShell) generateSaveScript(w *BashWriter, scriptPath, script string) (string, error) {
-	w.Line(fmt.Sprintf("touch %s", scriptPath))
-	w.Line(fmt.Sprintf("chmod 777 %s", scriptPath))
-	w.Line(fmt.Sprintf("echo %s > %s", w.escape(script), scriptPath))
+	w.line("touch", scriptPath)
+	w.line("chmod 777", scriptPath)
+	w.line("echo", w.escape(script), ">", scriptPath)
 
 	return w.String(), nil
 }
