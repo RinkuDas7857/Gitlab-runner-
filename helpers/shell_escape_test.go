@@ -22,8 +22,9 @@ func BenchmarkEscaping(b *testing.B) {
 		b.SetBytes(int64(len(input)))
 		b.ReportAllocs()
 
+		ansic := ANSICQuoting{}
 		for i := 0; i < b.N; i++ {
-			ShellEscape(input)
+			ansic.Escape(input)
 		}
 	})
 
@@ -31,8 +32,9 @@ func BenchmarkEscaping(b *testing.B) {
 		b.SetBytes(int64(len(input)))
 		b.ReportAllocs()
 
+		posix := PosixQuoting{}
 		for i := 0; i < b.N; i++ {
-			PosixShellEscape(input)
+			posix.Escape(input)
 		}
 	})
 
@@ -64,8 +66,9 @@ func TestShellEscape(t *testing.T) {
 		{"'$HOME'", `$'\'$HOME\''`},
 	}
 
+	ansic := ANSICQuoting{}
 	for _, test := range tests {
-		actual := ShellEscape(test.in)
+		actual := ansic.Escape(test.in)
 		assert.Equal(t, test.out, actual, "src=%v", test.in)
 	}
 }
@@ -86,8 +89,9 @@ func TestPosixShellEscape(t *testing.T) {
 		{"export variable='test' && echo $variable", `"export variable='test' && echo \$variable"`},
 	}
 
+	posix := PosixQuoting{}
 	for _, test := range tests {
-		actual := PosixShellEscape(test.in)
+		actual := posix.Escape(test.in)
 		assert.Equal(t, test.out, actual, "src=%v", test.in)
 	}
 }

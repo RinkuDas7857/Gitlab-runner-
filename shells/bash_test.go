@@ -12,17 +12,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitlab-runner/common"
+	"gitlab.com/gitlab-org/gitlab-runner/helpers"
 )
 
 func TestBash_CommandShellEscapesLegacy(t *testing.T) {
-	writer := &BashWriter{useNewEscape: false}
+	writer := &BashWriter{noLegacyEscaper: helpers.ANSICQuoting{}}
 	writer.Command("foo", "x&(y)")
 
 	assert.Equal(t, `$'foo' $'x&(y)'`+"\n", writer.String())
 }
 
 func TestBash_IfCmdShellEscapesLegacy(t *testing.T) {
-	writer := &BashWriter{useNewEscape: false}
+	writer := &BashWriter{noLegacyEscaper: helpers.ANSICQuoting{}}
 	writer.IfCmd("foo", "x&(y)")
 
 	assert.Equal(t, `if $'foo' $'x&(y)' >/dev/null 2>&1; then`+"\n", writer.String())
@@ -52,7 +53,7 @@ func TestBash_CommandShellEscapes(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		writer := &BashWriter{useNewEscape: true}
+		writer := &BashWriter{noLegacyEscaper: helpers.ANSICQuoting{}, escaper: helpers.ANSICQuoting{}}
 		writer.Command(tc.command, tc.args...)
 
 		assert.Equal(t, tc.expected, writer.String())
@@ -60,7 +61,7 @@ func TestBash_CommandShellEscapes(t *testing.T) {
 }
 
 func TestBash_IfCmdShellEscapes(t *testing.T) {
-	writer := &BashWriter{useNewEscape: true}
+	writer := &BashWriter{noLegacyEscaper: helpers.ANSICQuoting{}, escaper: helpers.ANSICQuoting{}}
 	writer.IfCmd("foo", "x&(y)")
 
 	assert.Equal(t, "if foo $'x&(y)' >/dev/null 2>&1; then\n", writer.String())

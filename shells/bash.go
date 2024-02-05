@@ -82,29 +82,44 @@ type BashWriter struct {
 	Shell         string
 	indent        int
 
+	noLegacyEscaper helpers.Escaper
+	escaper         helpers.Escaper
+
 	checkForErrors                   bool
 	useNewEval                       bool
-	useNewEscape                     bool
-	usePosixEscape                   bool
 	useJSONInitializationTermination bool
 
 	setPermissionsBeforeCleanup bool
 }
 
 func NewBashWriter(build *common.Build, shell string) *BashWriter {
-	return &BashWriter{
+	bw := &BashWriter{
 		TemporaryPath:  build.TmpProjectDir(),
 		Shell:          shell,
 		checkForErrors: build.IsFeatureFlagOn(featureflags.EnableBashExitCodeCheck),
 		useNewEval:     build.IsFeatureFlagOn(featureflags.UseNewEvalStrategy),
-		useNewEscape:   build.IsFeatureFlagOn(featureflags.UseNewShellEscape),
-		usePosixEscape: build.IsFeatureFlagOn(featureflags.PosixlyCorrectEscapes),
 		// useJSONInitializationTermination is only used for kubernetes executor when
 		// the feature flag FF_USE_LEGACY_KUBERNETES_EXECUTION_STRATEGY is set to false
 		useJSONInitializationTermination: build.Runner.Executor == common.ExecutorKubernetes &&
 			!build.IsFeatureFlagOn(featureflags.UseLegacyKubernetesExecutionStrategy),
 		setPermissionsBeforeCleanup: build.IsFeatureFlagOn(featureflags.SetPermissionsBeforeCleanup),
 	}
+
+	switch {
+	case build.IsFeatureFlagOn(featureflags.PosixlyCorrectEscapes):
+		bw.escaper = helpers.PosixQuoting{}
+		bw.noLegacyEscaper = bw.escaper
+
+	case build.IsFeatureFlagOn(featureflags.UseNewShellEscape):
+		bw.escaper = helpers.ANSICQuoting{}
+		bw.noLegacyEscaper = bw.escaper
+
+	default:
+		bw.noLegacyEscaper = helpers.ANSICQuoting{}
+		bw.escaper = nil
+	}
+
+	return bw
 }
 
 func (b *BashWriter) GetTemporaryPath() string {
@@ -361,25 +376,19 @@ func (b *BashWriter) Finish(trace bool) string {
 }
 
 func (b *BashWriter) escape(input string) string {
-	if b.usePosixEscape {
-		return helpers.PosixShellEscape(input)
-	}
-
-	if b.useNewEscape {
-		return helpers.ShellEscape(input)
+	if b.escaper != nil {
+		return b.escaper.Escape(input)
 	}
 
 	return helpers.ShellEscapeLegacy(input)
 }
 
 func (b *BashWriter) escapeNoLegacy(input string) string {
-	// We don't want to use the `escape` function since the legacy
-	// escape will not always work for us, opening us for vulnerabilities
-	if b.usePosixEscape {
-		return helpers.PosixShellEscape(input)
+	if b.noLegacyEscaper == nil {
+		b.noLegacyEscaper = helpers.ANSICQuoting{}
 	}
 
-	return helpers.ShellEscape(input)
+	return b.noLegacyEscaper.Escape(input)
 }
 
 func (b *BashShell) GetName() string {
@@ -412,8 +421,9 @@ func (b *BashShell) GetConfiguration(info common.ShellScriptInfo) (*common.Shell
 	}
 
 	script.CmdLine = script.Command
+	escaper := helpers.ANSICQuoting{}
 	for _, arg := range script.Arguments {
-		script.CmdLine += " " + helpers.ShellEscape(arg)
+		script.CmdLine += " " + escaper.Escape(arg)
 	}
 
 	return script, nil

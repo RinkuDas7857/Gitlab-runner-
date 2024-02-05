@@ -44,40 +44,48 @@ var modeTable = [256]mode{
 	'{': quo, '|': quo, '}': quo, '~': quo,
 }
 
-// ShellEscape returns either a string identical to the input, or an escaped
+type Escaper interface {
+	Escape(string) string
+}
+
+type ANSICQuoting struct {
+	sb strings.Builder
+}
+
+// Escape returns either a string identical to the input, or an escaped
 // string if certain characters are present. ANSI-C Quoting is used for
 // control characters and hexcodes are used for non-ascii characters.
-func ShellEscape(input string) string {
+func (q ANSICQuoting) Escape(input string) string {
 	if input == "" {
 		return "''"
 	}
 
-	var sb strings.Builder
-	sb.Grow(len(input) * 2)
+	q.sb.Reset()
+	q.sb.Grow(len(input) * 2)
 
 	escape := false
 	for _, c := range []byte(input) {
 		mode := modeTable[c]
 		switch mode {
 		case lit:
-			sb.WriteByte(c)
+			q.sb.WriteByte(c)
 		case quo:
-			sb.WriteByte(c)
+			q.sb.WriteByte(c)
 			escape = true
 		case "":
-			sb.Write([]byte{'\\', 'x', hextable[c>>4], hextable[c&0x0f]})
+			q.sb.Write([]byte{'\\', 'x', hextable[c>>4], hextable[c&0x0f]})
 			escape = true
 		default:
-			sb.WriteString(string(mode))
+			q.sb.WriteString(string(mode))
 			escape = true
 		}
 	}
 
 	if escape {
-		return "$'" + sb.String() + "'"
+		return "$'" + q.sb.String() + "'"
 	}
 
-	return sb.String()
+	return q.sb.String()
 }
 
 // posixModeTable defines what characters need quoting, and which need to be
@@ -91,33 +99,37 @@ var posixModeTable = [256]mode{
 	'*': quo, '<': quo, '=': quo, '>': quo, '?': quo, '[': quo, '|': quo,
 }
 
-// PosixShellEscape double quotes strings and escapes a string where necessary.
-func PosixShellEscape(input string) string {
+type PosixQuoting struct {
+	sb strings.Builder
+}
+
+// Escape double quotes strings and escapes a string where necessary.
+func (q PosixQuoting) Escape(input string) string {
 	if input == "" {
 		return "''"
 	}
 
-	var sb strings.Builder
-	sb.Grow(len(input) * 2)
+	q.sb.Reset()
+	q.sb.Grow(len(input) * 2)
 
 	escape := false
 	for _, c := range []byte(input) {
 		mode := posixModeTable[c]
 		switch mode {
 		case quo:
-			sb.WriteByte(c)
+			q.sb.WriteByte(c)
 			escape = true
 		case "":
-			sb.WriteByte(c)
+			q.sb.WriteByte(c)
 		default:
-			sb.WriteString(string(mode))
+			q.sb.WriteString(string(mode))
 			escape = true
 		}
 	}
 
 	if escape {
-		return `"` + sb.String() + `"`
+		return `"` + q.sb.String() + `"`
 	}
 
-	return sb.String()
+	return q.sb.String()
 }
