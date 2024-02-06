@@ -1650,14 +1650,19 @@ func (s *executor) createSecretForMaskedVariable(ctx context.Context, data map[s
 	return newSecret, err
 }
 
+// Create as many secrets as necessary to contain all environment variables. Each secret
+// holds at most 1MiB of content data. This code assumes the secret size is just the sum
+// of the keys and values, but it actually ends up being a json document with some
+// overhead, so using ~90% of 1MiB...
+const MAX_SECRET_SIZE = 1024 * 920
+
 // Create a kubernetes secret to store masked environment variables and their values. The
 // secret is named using the project and job IDs plus a unique string.
 func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
-	// Create as many secrets as necessary to contain all environment variables. Each secret
-	// holds at most 1MiB of content data. This code assumes the secret size is just the sum
-	// of the keys and values, but it actually ends up being a json document with some
-	// overhead, so using ~90% of 1MiB...
-	const MAX_SECRET_SIZE = 1024 * 920
+	includeSecrets := make(map[string]struct{}) // map for efficient lookup
+	for _, s := range s.Config.Kubernetes.EntrypointSecrets {
+		includeSecrets[s] = struct{}{}
+	}
 
 	envVars := s.Build.GetAllVariables()
 	secrets := make([]*api.Secret, 0)
@@ -1681,7 +1686,6 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 			continue
 		}
 
-		// Check whether the current variable will fit in the current secret contents.
 		currentVariableSize := len(v.Key) + len(v.Value)
 		if secretDataSize+currentVariableSize < MAX_SECRET_SIZE {
 			secretData[v.Key] = []byte(v.Value)
@@ -1690,14 +1694,12 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 		}
 
 		// This variable cannot be added to the current secret, it would be too big.
-		// Create a secret with the previous data.
+		// Create a secret with the previous data and start the next secret.
 		secret, err := s.createSecretForMaskedVariable(ctx, secretData)
 		if err != nil {
 			return err
 		}
 		secrets = append(secrets, secret)
-
-		// Begin the next secret.
 		secretData = make(map[string][]byte)
 		secretData[v.Key] = []byte(v.Value)
 		secretDataSize = currentVariableSize
