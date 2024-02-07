@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1650,20 +1651,11 @@ func (s *executor) createSecretForMaskedVariable(ctx context.Context, data map[s
 	return newSecret, err
 }
 
-func stringListToSet(list []string) map[string]struct{} {
-	m := make(map[string]struct{})
-	for _, s := range list {
-		m[s] = struct{}{}
-	}
-	return m
-}
-
-func shouldIncludeInSecret(v common.JobVariable, includeSecrets map[string]struct{}) bool {
+func shouldIncludeInSecret(v common.JobVariable, includeSecrets []string) bool {
 	if !v.Masked {
 		return false
 	}
-	_, include := includeSecrets[v.Key]
-	return include
+	return slices.Contains(includeSecrets, v.Key)
 }
 
 // Create a kubernetes secret to store masked environment variables and their values. The
@@ -1675,15 +1667,13 @@ func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
 	// overhead, so using ~90% of 1MiB...
 	const MAX_SECRET_SIZE = 1024 * 920
 
-	includeSecrets := stringListToSet(s.Config.Kubernetes.EntrypointSecrets)
-
 	envVars := s.Build.GetAllVariables()
 	secrets := make([]*api.Secret, 0)
 	secretDataSize := 0
 	secretData := make(map[string][]byte)
 
 	for _, v := range envVars {
-		if !shouldIncludeInSecret(v, includeSecrets) {
+		if !shouldIncludeInSecret(v, s.Config.Kubernetes.EntrypointSecrets) {
 			continue
 		}
 
