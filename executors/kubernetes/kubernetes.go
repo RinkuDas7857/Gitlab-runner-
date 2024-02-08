@@ -1665,7 +1665,7 @@ func (s *executor) getIncludedSecrets() []common.JobVariable {
 		if v.File {
 			secretSize := len(v.Key) + len(v.Value)
 			if secretSize >= MAX_SECRET_SIZE {
-				s.BuildLogger.Debugln(fmt.Sprintf("Not including %s due to size", v.Key))
+				s.BuildLogger.Warningln(fmt.Sprintf("Not including %s due to size", v.Key))
 				return false
 			}
 		}
