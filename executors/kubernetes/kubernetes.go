@@ -1651,32 +1651,36 @@ func (s *executor) createSecretForMaskedVariable(ctx context.Context, data map[s
 	return newSecret, err
 }
 
-func shouldIncludeInSecret(v common.JobVariable, includeSecrets []string) bool {
-	if !v.Masked {
-		return false
-	}
-	return slices.Contains(includeSecrets, v.Key)
+// Create as many secrets as necessary to contain all environment variables. Each secret
+// holds at most 1MiB of content data. This code assumes the secret size is just the sum
+// of the keys and values, but it actually ends up being a json document with some
+// overhead, so using ~90% of 1MiB...
+const MAX_SECRET_SIZE = 1024 * 920
+
+func (s *executor) getIncludedSecrets() []common.JobVariable {
+	return lo.Filter(s.Build.GetAllVariables(), func(v common.JobVariable, _ int) bool {
+		if !v.Masked {
+			return false
+		}
+		if v.File {
+			secretSize := len(v.Key) + len(v.Value)
+			if secretSize >= MAX_SECRET_SIZE {
+				s.BuildLogger.Debugln(fmt.Sprintf("Not including %s due to size", v.Key))
+				return false
+			}
+		}
+		return slices.Contains(s.Config.Kubernetes.EntrypointSecrets, v.Key)
+	})
 }
 
 // Create a kubernetes secret to store masked environment variables and their values. The
 // secret is named using the project and job IDs plus a unique string.
 func (s *executor) setupMaskedVariablesSecrets(ctx context.Context) error {
-	// Create as many secrets as necessary to contain all environment variables. Each secret
-	// holds at most 1MiB of content data. This code assumes the secret size is just the sum
-	// of the keys and values, but it actually ends up being a json document with some
-	// overhead, so using ~90% of 1MiB...
-	const MAX_SECRET_SIZE = 1024 * 920
-
-	envVars := s.Build.GetAllVariables()
 	secrets := make([]*api.Secret, 0)
 	secretDataSize := 0
 	secretData := make(map[string][]byte)
 
-	for _, v := range envVars {
-		if !shouldIncludeInSecret(v, s.Config.Kubernetes.EntrypointSecrets) {
-			continue
-		}
-
+	for _, v := range s.getIncludedSecrets() {
 		// Each masked file-type variable goes in its own secret.
 		if v.File {
 			secretData := make(map[string][]byte)
