@@ -39,7 +39,7 @@ var (
 	dumbInitS390xChecksum   = env.NewDefault("DUMB_INIT_S390X_CHECKSUM", "8b3808c3c06d008b8f2eeb2789c7c99e0450b678d94fb50fd446b8f6a22e3a9d")
 	dumbInitPpc64leChecksum = env.NewDefault("DUMB_INIT_PPC64LE_CHECKSUM", "88b02a3bd014e4c30d8d54389597adc4f5a36d1d6b49200b5a4f6a71026c2246")
 
-	gitLfsVersion = env.NewDefault("GIT_LFS_VERSION", "3.4.0")
+	gitLfsVersion = env.NewDefault("GIT_LFS_VERSION", "3.4.1")
 
 	ubuntuVersion    = env.NewDefault("UBUNTU_VERSION", "20.04")
 	alpine316Version = env.NewDefault("ALPINE_316_VERSION", "3.16.5")
