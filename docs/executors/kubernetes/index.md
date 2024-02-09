@@ -1867,6 +1867,8 @@ Follow [issue #27976](https://gitlab.com/gitlab-org/gitlab-runner/-/issues/27976
 NOTE:
 In GitLab 14.5 to 15.0, GitLab Runner uses the entrypoint defined in a Docker image when used with the Kubernetes executor with `kube attach`.
 In GitLab 15.1 and later, the entrypoint defined in a Docker image is used with the Kubernetes executor when `FF_KUBERNETES_HONOR_ENTRYPOINT` is set.
+In GitLab 16.9 and later, the entrypoint can access masked GitLab variables listed in the config TOML. See the
+configuration key `entrypoint_secrets` for more details. Only the Kubernetes executor is currently supported.
 
 The container entry point has the following known issues:
 
