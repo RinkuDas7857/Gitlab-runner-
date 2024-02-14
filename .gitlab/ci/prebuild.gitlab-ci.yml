@@ -14,6 +14,11 @@
     paths:
     - out/helper-images/
     expire_in: 7d
+  cache:
+    paths:
+      - buildx_cache
+    key: "${CI_JOB_NAME}-${CI_COMMIT_REF_SLUG}-${BUILD_IMAGE}-"
+    policy: pull-push
 
 helper images:
   extends:

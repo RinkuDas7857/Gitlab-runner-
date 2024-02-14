@@ -101,7 +101,8 @@ setup_docker_context
 # shellcheck disable=SC2154
 _docker_buildx build \
         --platform "${platform}" \
-        --no-cache \
+        --cache-to type=local,dest=buildx_cache,mode=max,compression=zstd \
+        --cache-from type=local,src=buildx_cache \
         --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
         --build-arg "ARCH=${platform_arch}" \
         --build-arg "http_proxy=${http_proxy}" \

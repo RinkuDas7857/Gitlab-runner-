@@ -16,7 +16,8 @@ build() {
 
     _docker_buildx build \
            --platform linux/amd64,linux/ppc64le,linux/arm64  \
-           --no-cache \
+           --cache-to type=local,dest=buildx_cache,mode=max,compression=zstd \
+           --cache-from type=local,src=buildx_cache \
            --build-arg UBI_VERSION="${UBI_VERSION}" \
            --push \
            -t "${BUILD_IMAGE}" \
