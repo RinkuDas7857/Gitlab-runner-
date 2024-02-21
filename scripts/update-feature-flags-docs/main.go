@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"text/template"
 
@@ -88,11 +87,7 @@ func prepareTable() string {
 
 	buffer := new(bytes.Buffer)
 
-	ffs := slices.DeleteFunc(featureflags.GetAll(), func(ff featureflags.FeatureFlag) bool {
-		return ff.Name == "FF_TEST_FEATURE"
-	})
-
-	err = tpl.Execute(buffer, ffs)
+	err = tpl.Execute(buffer, featureflags.GetAll())
 	if err != nil {
 		panic(fmt.Sprintf("Error while executing the template: %v", err))
 	}

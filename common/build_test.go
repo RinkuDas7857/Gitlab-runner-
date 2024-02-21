@@ -743,13 +743,16 @@ func TestDebugTrace(t *testing.T) {
 			debugTraceVariableValue:   "true",
 			expectedValue:             false,
 			debugTraceFeatureDisabled: true,
-			expectedLogOutput:         "CI_DEBUG_TRACE: usage is disabled on this Runner",
+			expectedLogOutput:         "CI_DEBUG_TRACE usage is disabled on this Runner",
 		},
 	}
 
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			logger, hooks := test.NewNullLogger()
+
 			build := &Build{
+				logger: buildlogger.New(nil, logrus.NewEntry(logger)),
 				JobResponse: JobResponse{
 					Variables: JobVariables{},
 				},
@@ -771,7 +774,8 @@ func TestDebugTrace(t *testing.T) {
 			assert.Equal(t, testCase.expectedValue, isTraceEnabled)
 
 			if testCase.expectedLogOutput != "" {
-				output := errors.Join(build.Settings().Errors...).Error()
+				output, err := hooks.LastEntry().String()
+				require.NoError(t, err)
 				assert.Contains(t, output, testCase.expectedLogOutput)
 			}
 		})
@@ -1725,13 +1729,13 @@ func TestGitSubmodulePaths(t *testing.T) {
 		"not defined": {
 			isVariableSet:  false,
 			value:          "",
-			expectedResult: nil,
+			expectedResult: []string{},
 			expectedError:  false,
 		},
 		"empty": {
 			isVariableSet:  true,
 			value:          "",
-			expectedResult: nil,
+			expectedResult: []string{},
 			expectedError:  false,
 		},
 		"select submodule 1": {
@@ -1893,7 +1897,7 @@ func TestGitSubmoduleUpdateFlags(t *testing.T) {
 	}{
 		"empty update flags": {
 			value:          "",
-			expectedResult: nil,
+			expectedResult: []string{},
 		},
 		"use custom update flags": {
 			value:          "custom-flags",
@@ -2090,7 +2094,7 @@ func TestBuild_GetExecutorJobSectionAttempts(t *testing.T) {
 	tests := []struct {
 		attempts         string
 		expectedAttempts int
-		expectedErr      bool
+		expectedErr      error
 	}{
 		{
 			attempts:         "",
@@ -2102,13 +2106,13 @@ func TestBuild_GetExecutorJobSectionAttempts(t *testing.T) {
 		},
 		{
 			attempts:         "0",
-			expectedAttempts: DefaultExecutorStageAttempts,
-			expectedErr:      true,
+			expectedAttempts: 0,
+			expectedErr:      &invalidAttemptError{},
 		},
 		{
 			attempts:         "99",
-			expectedAttempts: DefaultExecutorStageAttempts,
-			expectedErr:      true,
+			expectedAttempts: 0,
+			expectedErr:      &invalidAttemptError{},
 		},
 	}
 
@@ -2125,10 +2129,8 @@ func TestBuild_GetExecutorJobSectionAttempts(t *testing.T) {
 				},
 			}
 
-			attempts := build.GetExecutorJobSectionAttempts()
-			if tt.expectedErr {
-				assert.NotEmpty(t, build.Settings().Errors)
-			}
+			attempts, err := build.GetExecutorJobSectionAttempts()
+			assert.ErrorIs(t, err, tt.expectedErr)
 			assert.Equal(t, tt.expectedAttempts, attempts)
 		})
 	}
@@ -2485,7 +2487,7 @@ func Test_GetDebugServicePolicy(t *testing.T) {
 		"bogus value": {
 			variable: JobVariable{Key: "CI_DEBUG_SERVICES", Value: "blammo", Public: true},
 			want:     false,
-			wantLog:  "CI_DEBUG_SERVICES: expected bool got \"blammo\", using default value: false",
+			wantLog:  "failed to parse value 'blammo' for CI_DEBUG_SERVICES variable:",
 		},
 		"enabled": {
 			variable: JobVariable{Key: "CI_DEBUG_SERVICES", Value: "true", Public: true},
@@ -2493,10 +2495,18 @@ func Test_GetDebugServicePolicy(t *testing.T) {
 		},
 	}
 
+	logs := bytes.Buffer{}
+	lentry := logrus.New()
+	lentry.Out = &logs
+	logger := buildlogger.New(nil, logrus.NewEntry(lentry))
+
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			logs.Reset()
+
 			b := &Build{
 				Runner:      &RunnerConfig{},
+				logger:      logger,
 				JobResponse: JobResponse{Variables: []JobVariable{tt.variable}},
 			}
 
@@ -2505,9 +2515,9 @@ func Test_GetDebugServicePolicy(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 
 			if tt.wantLog == "" {
-				assert.Empty(t, b.Settings().Errors)
+				assert.Empty(t, logs.String())
 			} else {
-				assert.Contains(t, errors.Join(b.Settings().Errors...).Error(), tt.wantLog)
+				assert.Contains(t, logs.String(), tt.wantLog)
 			}
 		})
 	}
