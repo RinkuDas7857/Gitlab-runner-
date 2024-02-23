@@ -175,7 +175,7 @@ unit test:
   - 'prepare done'
   script:
   - >
-    splitic test \
+    splitic test -debug \
       -junit-report .splitic/junit_${CI_NODE_INDEX}.xml \
       -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner \
       -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_unix.env \
@@ -192,7 +192,7 @@ unit test with race:
   script:
   - make splitic
   - >
-    splitic test \
+    splitic test -debug \
       -race \
       -junit-report .splitic/junit_${CI_NODE_INDEX}.xml \
       -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner \
@@ -210,7 +210,7 @@ integration test:
   script:
   - go install gitlab.com/gitlab-org/fleeting/fleeting-plugin-static/cmd/fleeting-plugin-static@latest
   - >
-    splitic test \
+    splitic test -debug \
       -junit-report .splitic/junit_${CI_NODE_INDEX}.xml \
       -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner \
       -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_unix.env \
@@ -228,7 +228,7 @@ integration test with race:
   script:
   - make splitic
   - >
-    splitic test \
+    splitic test -debug \
       -race \
       -junit-report .splitic/junit_${CI_NODE_INDEX}.xml \
       -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner \
@@ -293,7 +293,7 @@ fuzz variable mask:
   - 'clone test repo'
   - 'prepare done'
   script:
-  - splitic test -junit-report .splitic/junit_${WINDOWS_VERSION}_${CI_NODE_INDEX}.xml -quarantined ci/.test-failures.${WINDOWS_VERSION}.txt -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_windows.env -fail-exit-code 99 ./... -- -timeout 20m
+  - splitic test -debug -junit-report .splitic/junit_${WINDOWS_VERSION}_${CI_NODE_INDEX}.xml -quarantined ci/.test-failures.${WINDOWS_VERSION}.txt -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_windows.env -fail-exit-code 99 ./... -- -timeout 20m
 
 .windows integration test:
   extends:
@@ -309,7 +309,7 @@ fuzz variable mask:
   - docker network create -d "nat" test-network
   - docker network rm test-network
   - go install gitlab.com/gitlab-org/fleeting/fleeting-plugin-static/cmd/fleeting-plugin-static@latest
-  - splitic test -junit-report .splitic/junit_${WINDOWS_VERSION}_${CI_NODE_INDEX}.xml -quarantined ci/.test-failures.${WINDOWS_VERSION}.txt -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_windows.env -fail-exit-code 99 -tags integration ./... -- -timeout 45m
+  - splitic test -debug -junit-report .splitic/junit_${WINDOWS_VERSION}_${CI_NODE_INDEX}.xml -quarantined ci/.test-failures.${WINDOWS_VERSION}.txt -cover-report .splitic/cover_${CI_NODE_INDEX}.profile -cover -coverpkg gitlab.com/gitlab-org/gitlab-runner -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_windows.env -fail-exit-code 99 -tags integration ./... -- -timeout 45m
 
 # Only test the oldest supported version in merge requests,
 # but test all versions in the default branch.
@@ -400,7 +400,7 @@ integration_k8s:
   - make splitic
   script:
   - >
-    splitic test \
+    splitic test -debug \
       -tags integration,kubernetes \
       -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_unix.env \
       gitlab.com/gitlab-org/gitlab-runner/executors/kubernetes \

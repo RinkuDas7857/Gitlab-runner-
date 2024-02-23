@@ -133,7 +133,7 @@ mage-test:
 	go test -ldflags "$(GO_LDFLAGS)" -v ./magefiles/...
 
 git1.8-test: $(SPLITIC)
-	splitic test -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_unix.env \
+	splitic test -debug -env-passthrough ./scripts/envs/allowlist_common.env -env-passthrough ./scripts/envs/allowlist_unix.env \
 		gitlab.com/gitlab-org/gitlab-runner/executors/shell gitlab.com/gitlab-org/gitlab-runner/shells \
 		-- -ldflags "$(GO_LDFLAGS)"
 
