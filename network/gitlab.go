@@ -620,7 +620,6 @@ func (n *GitLabClient) RequestJob(
 				WithError(err).Errorln("Error on fetching TLS Data from API response...", "error")
 		}
 		addTLSData(&response, tlsData)
-
 		return &response, true
 	case http.StatusForbidden:
 		config.Log().WithField("status", statusText).Errorln("Checking for jobs...", "forbidden")
@@ -632,7 +631,8 @@ func (n *GitLabClient) RequestJob(
 		config.Log().WithField("status", statusText).Errorln("Checking for jobs...", "client error")
 		return nil, false
 	default:
-		config.Log().WithField("status", statusText).Warningln("Checking for jobs...", "failed")
+		config.Log().WithFields(logrus.Fields{"status": statusText, "httpCode": result}).
+			Warningln("Checking for jobs...", "failed")
 		return nil, true
 	}
 }
