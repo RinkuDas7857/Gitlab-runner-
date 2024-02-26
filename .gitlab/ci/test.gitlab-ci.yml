@@ -273,7 +273,7 @@ fuzz variable mask:
   - $env:Path = "C:\Program Files\Go\bin;$env:Path"
   - go version
   - *go-cache-windows_before_script
-  - go install gitlab.com/stanhu/splitic@sh-add-more-debug
+  - go install gitlab.com/stanhu/splitic@69b20f87c380d86ff6c2bfca6a0af13d948d7ae0
   - $env:Path += ";$(go env GOPATH)/bin"
   artifacts:
     paths:
