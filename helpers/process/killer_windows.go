@@ -34,7 +34,7 @@ func (pk *windowsKiller) Terminate() {
 		return
 	}
 
-	fmt.Printf(os.Stderr, "=== Terminating Windows process\n")
+	fmt.Fprintf(os.Stderr, "=== Terminating Windows process\n")
 
 	if err := taskTerminate(pk.cmd.Process().Pid); err != nil {
 		pk.logger.Warn("Failed to terminate process:", err)
@@ -93,7 +93,7 @@ func taskTerminate(pid int) error {
 	// always attempt to restore console and Ctrl-C handler for runner process
 	// so collect any errors together instead of returning early
 	var errors *multierror.Error
-	fmt.Printf(os.Stderr, "=== Sending CTRL-C to Windows process\n")
+	fmt.Fprintf(os.Stderr, "=== Sending CTRL-C to Windows process\n")
 	errors = multierror.Append(errors, generateConsoleCtrlEvent(
 		"send Ctrl-C event to process being terminated", uintptr(windows.CTRL_C_EVENT), uintptr(pid)))
 	errors = multierror.Append(errors, freeConsole(
