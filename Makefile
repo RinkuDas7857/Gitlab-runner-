@@ -330,7 +330,7 @@ $(GOX):
 	go install github.com/mitchellh/gox@9f712387e2d2c810d99040228f89ae5bb5dd21e5
 
 $(SPLITIC):
-	go install gitlab.com/stanhu/splitic@latest
+	go install gitlab.com/stanhu/splitic@sh-add-more-debug
 
 $(MAGE): .tmp
 	cd .tmp && \
