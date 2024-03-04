@@ -70,7 +70,8 @@ to be protected in job log output, but not in container logs.
 From a terminal, logged in as root, run the following. 
 
 WARNING:
-This should not be performed on runners using [Shell executor](../executors/shell.md) as this will redefine the `systemd` service and all jobs will be running as root. This poses security risks and changes to file ownership will then make it hard to revert to a non privileged account.
+This should not be performed on runners with the [Shell executor](../executors/shell.md), because it redefines the `systemd` service
+and runs all jobs as root. This poses security risks and changes to file ownership that makes it difficult to revert to a non privileged account.
 
 ```shell
 gitlab-runner stop
