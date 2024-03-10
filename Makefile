@@ -48,6 +48,8 @@ MOCKERY = mockery
 
 SPLITIC = splitic
 MAGE = mage
+MANIFEST_TOOL = manifest-tool
+MANIFEST_TOOL_VERSION ?= v2.1.5
 
 GOLANGLINT_VERSION ?= v1.53.2
 GOLANGLINT ?= .tmp/golangci-lint$(GOLANGLINT_VERSION)
@@ -343,6 +345,9 @@ $(MAGE): .tmp
 	git clone https://github.com/magefile/mage && \
 	cd mage && \
 	go run bootstrap.go
+
+$(MANIFEST_TOOL):
+	go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool@$(MANIFEST_TOOL_VERSION)
 
 $(GOLANGLINT): TOOL_BUILD_DIR := .tmp/build/golangci-lint
 $(GOLANGLINT): $(GOLANGLINT_GOARGS)
