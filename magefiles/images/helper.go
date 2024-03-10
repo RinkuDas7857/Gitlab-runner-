@@ -7,19 +7,19 @@ import (
 	"os"
 	"text/template"
 
-	"gopkg.in/yaml.v2"
 	"github.com/samber/lo"
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/build"
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/ci"
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/docker"
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/env"
+	"gopkg.in/yaml.v2"
 )
 
 var helperImageName = env.NewDefault("HELPER_IMAGE_NAME", "gitlab-runner-helper")
 
 type dockerPlatformSpec struct {
-	os string
-	arch string
+	os      string
+	arch    string
 	variant string
 }
 
@@ -31,13 +31,13 @@ func (dps dockerPlatformSpec) String() string {
 	}
 }
 
-var platformMap = map[string]dockerPlatformSpec {
-	"x86_64":  dockerPlatformSpec{os:"linux", arch:"amd64"},
-	"arm":     dockerPlatformSpec{os:"linux", arch:"arm",   variant:"v7"},
-	"arm64":   dockerPlatformSpec{os:"linux", arch:"arm64", variant:"v8"},
-	"s390x":   dockerPlatformSpec{os:"linux", arch:"s390x"},
-	"ppc64le": dockerPlatformSpec{os:"linux", arch:"ppc64le"},
-	"riscv64": dockerPlatformSpec{os:"linux", arch:"riscv64"},
+var platformMap = map[string]dockerPlatformSpec{
+	"x86_64":  dockerPlatformSpec{os: "linux", arch: "amd64"},
+	"arm":     dockerPlatformSpec{os: "linux", arch: "arm", variant: "v7"},
+	"arm64":   dockerPlatformSpec{os: "linux", arch: "arm64", variant: "v8"},
+	"s390x":   dockerPlatformSpec{os: "linux", arch: "s390x"},
+	"ppc64le": dockerPlatformSpec{os: "linux", arch: "ppc64le"},
+	"riscv64": dockerPlatformSpec{os: "linux", arch: "riscv64"},
 }
 
 var flavorsSupportingPWSH = []string{
@@ -111,7 +111,7 @@ func (bs helperBuildSet) tags() []string {
 		}), item.tagSpec.render())
 	}))
 	tags = append(tags, bs.manifestTagSpec.render())
-	tags = append(tags, lo.Map(bs.manifestAliasSpecs, func (item helperTagSpec, _ int) string {
+	tags = append(tags, lo.Map(bs.manifestAliasSpecs, func(item helperTagSpec, _ int) string {
 		return item.render()
 	})[:]...)
 	return tags
@@ -122,14 +122,14 @@ func (bs helperBuildSet) renderManifestToolYaml() string {
 	manifest["image"] = bs.manifestTagSpec.render()
 	manifest["manifests"] = lo.Map(bs.componentBuilds, func(build helperBuild, _ int) map[string]interface{} {
 		platform := map[string]string{
-			"os": build.platform.os,
+			"os":           build.platform.os,
 			"architecture": build.platform.arch,
 		}
 		if "" != build.platform.variant {
 			platform["variant"] = build.platform.variant
 		}
 		comp := map[string]interface{}{
-			"image": build.tagSpec.render(),
+			"image":    build.tagSpec.render(),
 			"platform": platform,
 		}
 		return comp
@@ -145,21 +145,20 @@ func (bs helperBuildSet) renderManifestToolAliasYaml(i int) (string, error) {
 	manifest["image"] = bs.manifestAliasSpecs[i].render()
 	manifest["manifests"] = lo.Map(bs.componentBuilds, func(build helperBuild, _ int) map[string]interface{} {
 		platform := map[string]string{
-			"os": build.platform.os,
+			"os":           build.platform.os,
 			"architecture": build.platform.arch,
 		}
 		if "" != build.platform.variant {
 			platform["variant"] = build.platform.variant
 		}
 		comp := map[string]interface{}{
-			"image": build.aliasSpecs[i].render(),
+			"image":    build.aliasSpecs[i].render(),
 			"platform": platform,
 		}
 		return comp
 	})
 	return toYAML(manifest), nil
 }
-
 
 func toYAML(manifest interface{}) string {
 	src, err := yaml.Marshal(manifest)
@@ -217,17 +216,17 @@ func AssembleReleaseHelper(flavor, prefix string) helperBlueprint {
 
 	builds := helperBlueprintImpl{
 		BlueprintBase: build.NewBlueprintBase(ci.RegistryImage, ci.RegistryAuthBundle, docker.BuilderEnvBundle, helperImageName),
-		buildSets:          []helperBuildSet{},
+		buildSets:     []helperBuildSet{},
 	}
 
 	imageName := builds.Env().Value(helperImageName)
 	registryImage := builds.Env().Value(ci.RegistryImage)
 
 	primaryBuildSet := helperBuildSet{
-		componentBuilds: []helperBuild{},
-		manifestTagSpec: newHelperTagSpec(prefix, "", "", imageName, registryImage, build.Revision(), build.IsLatest()),
+		componentBuilds:    []helperBuild{},
+		manifestTagSpec:    newHelperTagSpec(prefix, "", "", imageName, registryImage, build.Revision(), build.IsLatest()),
 		manifestAliasSpecs: []helperTagSpec{newHelperTagSpec(prefix, "", "", imageName, registryImage, build.RefTag(), build.IsLatest())},
-		manifestType: "oci",
+		manifestType:       "oci",
 	}
 
 	if build.IsLatest() {
