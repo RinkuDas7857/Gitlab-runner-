@@ -12,32 +12,17 @@ import (
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/ci"
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/docker"
 	"gitlab.com/gitlab-org/gitlab-runner/magefiles/env"
-	"gopkg.in/yaml.v2"
 )
 
 var helperImageName = env.NewDefault("HELPER_IMAGE_NAME", "gitlab-runner-helper")
 
-type dockerPlatformSpec struct {
-	os      string
-	arch    string
-	variant string
-}
-
-func (dps dockerPlatformSpec) String() string {
-	if "" != dps.variant {
-		return fmt.Sprintf("%s/%s/%s", dps.os, dps.arch, dps.variant)
-	} else {
-		return fmt.Sprintf("%s/%s", dps.os, dps.arch)
-	}
-}
-
-var platformMap = map[string]dockerPlatformSpec{
-	"x86_64":  dockerPlatformSpec{os: "linux", arch: "amd64"},
-	"arm":     dockerPlatformSpec{os: "linux", arch: "arm", variant: "v7"},
-	"arm64":   dockerPlatformSpec{os: "linux", arch: "arm64", variant: "v8"},
-	"s390x":   dockerPlatformSpec{os: "linux", arch: "s390x"},
-	"ppc64le": dockerPlatformSpec{os: "linux", arch: "ppc64le"},
-	"riscv64": dockerPlatformSpec{os: "linux", arch: "riscv64"},
+var platformMap = map[string]docker.PlatformSpec{
+	"x86_64":  docker.PlatformSpec{Os: "linux", Architecture: "amd64"},
+	"arm":     docker.PlatformSpec{Os: "linux", Architecture: "arm", Variant: "v7"},
+	"arm64":   docker.PlatformSpec{Os: "linux", Architecture: "arm64", Variant: "v8"},
+	"s390x":   docker.PlatformSpec{Os: "linux", Architecture: "s390x"},
+	"ppc64le": docker.PlatformSpec{Os: "linux", Architecture: "ppc64le"},
+	"riscv64": docker.PlatformSpec{Os: "linux", Architecture: "riscv64"},
 }
 
 var flavorsSupportingPWSH = []string{
@@ -50,9 +35,64 @@ var flavorsSupportingPWSH = []string{
 
 type helperBlueprint build.TargetBlueprint[build.Component, build.Component, []helperBuildSet]
 
+// Collects the architecture-specific variants for a given "flavor"
+// (e.g. alpine3.19, ubuntu, etc) of the helper together in one set to
+// facilitate building a single manifest list for each flavor.
+type helperBuildSet struct {
+	componentBuilds    []helperBuild
+	manifestTagSpec    helperTagSpec
+	manifestAliasSpecs []helperTagSpec
+	manifestType       string
+}
+
+func (bs helperBuildSet) tags() []string {
+	tags := lo.Flatten(lo.Map(bs.componentBuilds, func(item helperBuild, _ int) []string {
+		return append(lo.Map(item.aliasSpecs, func(item helperTagSpec, _ int) string {
+			return item.render()
+		}), item.tagSpec.render())
+	}))
+	tags = append(tags, bs.manifestTagSpec.render())
+	tags = append(tags, lo.Map(bs.manifestAliasSpecs, func(item helperTagSpec, _ int) string {
+		return item.render()
+	})[:]...)
+	return tags
+}
+
+func (bs helperBuildSet) renderManifestToolYaml() (string, error) {
+	manifest := docker.ManifestToolSpec{
+		Image: bs.manifestTagSpec.render(),
+		Manifests: lo.Map(bs.componentBuilds, func(build helperBuild, _ int) docker.ManifestImage {
+			return docker.ManifestImage{
+				Image:    build.tagSpec.render(),
+				Platform: build.platform,
+			}
+		}),
+	}
+	yaml, err := manifest.Render()
+	return yaml, err
+}
+
+func (bs helperBuildSet) renderManifestToolAliasYaml(i int) (string, error) {
+	if i >= len(bs.manifestAliasSpecs) {
+		return "", errors.New(fmt.Sprintf("No alias %d", i))
+	}
+	manifest := docker.ManifestToolSpec{
+		Image: bs.manifestAliasSpecs[i].render(),
+		Manifests: lo.Map(bs.componentBuilds, func(build helperBuild, _ int) docker.ManifestImage {
+			return docker.ManifestImage{
+				Image:    build.aliasSpecs[i].render(),
+				Platform: build.platform,
+			}
+		}),
+	}
+	yaml, err := manifest.Render()
+	return yaml, err
+}
+
+// Describes the architecture-specific artifacts for a given flavor.
 type helperBuild struct {
 	archive    string
-	platform   dockerPlatformSpec
+	platform   docker.PlatformSpec
 	tagSpec    helperTagSpec
 	aliasSpecs []helperTagSpec
 }
@@ -104,82 +144,8 @@ func (l helperTagSpec) render() string {
 	return out.String()
 }
 
-func (bs helperBuildSet) tags() []string {
-	tags := lo.Flatten(lo.Map(bs.componentBuilds, func(item helperBuild, _ int) []string {
-		return append(lo.Map(item.aliasSpecs, func(item helperTagSpec, _ int) string {
-			return item.render()
-		}), item.tagSpec.render())
-	}))
-	tags = append(tags, bs.manifestTagSpec.render())
-	tags = append(tags, lo.Map(bs.manifestAliasSpecs, func(item helperTagSpec, _ int) string {
-		return item.render()
-	})[:]...)
-	return tags
-}
-
-func (bs helperBuildSet) renderManifestToolYaml() string {
-	manifest := map[string]interface{}{}
-	manifest["image"] = bs.manifestTagSpec.render()
-	manifest["manifests"] = lo.Map(bs.componentBuilds, func(build helperBuild, _ int) map[string]interface{} {
-		platform := map[string]string{
-			"os":           build.platform.os,
-			"architecture": build.platform.arch,
-		}
-		if "" != build.platform.variant {
-			platform["variant"] = build.platform.variant
-		}
-		comp := map[string]interface{}{
-			"image":    build.tagSpec.render(),
-			"platform": platform,
-		}
-		return comp
-	})
-	return toYAML(manifest)
-}
-
-func (bs helperBuildSet) renderManifestToolAliasYaml(i int) (string, error) {
-	manifest := map[string]interface{}{}
-	if i >= len(bs.manifestAliasSpecs) {
-		return "", errors.New(fmt.Sprintf("No alias %d", i))
-	}
-	manifest["image"] = bs.manifestAliasSpecs[i].render()
-	manifest["manifests"] = lo.Map(bs.componentBuilds, func(build helperBuild, _ int) map[string]interface{} {
-		platform := map[string]string{
-			"os":           build.platform.os,
-			"architecture": build.platform.arch,
-		}
-		if "" != build.platform.variant {
-			platform["variant"] = build.platform.variant
-		}
-		comp := map[string]interface{}{
-			"image":    build.aliasSpecs[i].render(),
-			"platform": platform,
-		}
-		return comp
-	})
-	return toYAML(manifest), nil
-}
-
-func toYAML(manifest interface{}) string {
-	src, err := yaml.Marshal(manifest)
-	if err == nil {
-		return string(src)
-	}
-	return ""
-}
-
-type helperBuildSet struct {
-	componentBuilds    []helperBuild
-	manifestTagSpec    helperTagSpec
-	manifestAliasSpecs []helperTagSpec
-	manifestType       string
-}
-
 type helperBlueprintImpl struct {
 	build.BlueprintBase
-
-	// First level represents the set of manifests to create,
-	// second level is the set of images within a given manifest
 	buildSets []helperBuildSet
 }
 
@@ -316,7 +282,11 @@ func releaseImageTagSet(manifestTool *docker.ManifestToolContext, builder *docke
 	}
 
 	specFile := fmt.Sprintf("out/helper-images/spec-%s-%s.yml", buildSet.manifestTagSpec.prefix, buildSet.manifestTagSpec.version)
-	if err := os.WriteFile(specFile, []byte(buildSet.renderManifestToolYaml()), 0o644); err != nil {
+	specContent, err := buildSet.renderManifestToolYaml()
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(specFile, []byte(specContent), 0o644); err != nil {
 		return err
 	}
 
