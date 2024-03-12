@@ -98,48 +98,44 @@ type helperBuild struct {
 }
 
 type helperTagSpec struct {
-	suffix        string
+	Suffix        string
+	Prefix        string
+	Arch          string
+	ImageName     string
+	RegistryImage string
+	Version       string
 	baseTemplate  string
-	prefix        string
-	arch          string
-	imageName     string
-	registryImage string
-	version       string
+	specTemplate  string
 }
 
 func newHelperTagSpec(prefix, suffix, arch, imageName, registryImage, version string) helperTagSpec {
 	return helperTagSpec{
-		prefix:        prefix,
-		suffix:        suffix,
-		arch:          arch,
-		registryImage: registryImage,
-		imageName:     imageName,
-		version:       version,
-		baseTemplate:  "{{ .RegistryImage }}/{{ .ImageName }}:{{ .Prefix }}{{ if .Prefix }}-{{ end }}{{ .Arch}}{{ if .Arch }}-{{ end }}{{ .Version }}",
+		Prefix:        prefix,
+		Suffix:        suffix,
+		Arch:          arch,
+		RegistryImage: registryImage,
+		ImageName:     imageName,
+		Version:       version,
+		baseTemplate:  "{{ .RegistryImage }}/{{ .ImageName }}:{{ if .Prefix }}{{ .Prefix }}-{{ end }}{{ if .Arch }}{{ .Arch }}-{{ end }}{{ .Version }}{{ if .Suffix }}-{{ .Suffix }}{{ end }}",
+		specTemplate:  "spec-{{ if .Prefix }}{{ .Prefix }}-{{ end }}{{ .Version }}{{ if .Suffix }}-{{ .Suffix }}{{ end }}.yml",
 	}
 }
 
-func (l helperTagSpec) render() string {
-	context := struct {
-		RegistryImage string
-		ImageName     string
-		Prefix        string
-		Arch          string
-		Version       string
-	}{
-		RegistryImage: l.registryImage,
-		ImageName:     l.imageName,
-		Prefix:        l.prefix,
-		Arch:          l.arch,
-		Version:       l.version,
-	}
-
+func (l helperTagSpec) renderTemplate(tmplSrc string) string {
 	var out bytes.Buffer
-	tmpl := lo.Must(template.New("tmpl").Parse(l.baseTemplate + l.suffix))
+	tmpl := lo.Must(template.New("tmpl").Parse(tmplSrc))
 
-	lo.Must0(tmpl.Execute(&out, &context))
+	lo.Must0(tmpl.Execute(&out, &l))
 
 	return out.String()
+}
+
+func (l helperTagSpec) render() string {
+	return l.renderTemplate(l.baseTemplate)
+}
+
+func (l helperTagSpec) renderSpecFileName() string {
+	return l.renderTemplate(l.specTemplate)
 }
 
 type helperBlueprintImpl struct {
@@ -214,21 +210,21 @@ func AssembleReleaseHelper(flavor, prefix string) helperBlueprint {
 	if lo.Contains(flavorsSupportingPWSH, flavor) {
 		pwshBuildSet := helperBuildSet{
 			componentBuilds:    []helperBuild{},
-			manifestTagSpec:    newHelperTagSpec(prefix, "-pwsh", "", imageName, registryImage, build.Revision()),
-			manifestAliasSpecs: []helperTagSpec{newHelperTagSpec(prefix, "-pwsh", "", imageName, registryImage, build.RefTag())},
+			manifestTagSpec:    newHelperTagSpec(prefix, "pwsh", "", imageName, registryImage, build.Revision()),
+			manifestAliasSpecs: []helperTagSpec{newHelperTagSpec(prefix, "pwsh", "", imageName, registryImage, build.RefTag())},
 		}
 		if build.IsLatest() {
-			pwshBuildSet.manifestAliasSpecs = append(pwshBuildSet.manifestAliasSpecs, newHelperTagSpec(prefix, "-pwsh", "", imageName, registryImage, "latest"))
+			pwshBuildSet.manifestAliasSpecs = append(pwshBuildSet.manifestAliasSpecs, newHelperTagSpec(prefix, "pwsh", "", imageName, registryImage, "latest"))
 		}
 		pwshBuild := helperBuild{
 			archive:    fmt.Sprintf("out/helper-images/prebuilt-%s-x86_64-pwsh.tar.xz", flavor),
 			platform:   platformMap["x86_64"],
-			tagSpec:    newHelperTagSpec(prefix, "-pwsh", "x86_64", imageName, registryImage, build.Revision()),
-			aliasSpecs: []helperTagSpec{newHelperTagSpec(prefix, "-pwsh", "x86_64", imageName, registryImage, build.RefTag())},
+			tagSpec:    newHelperTagSpec(prefix, "pwsh", "x86_64", imageName, registryImage, build.Revision()),
+			aliasSpecs: []helperTagSpec{newHelperTagSpec(prefix, "pwsh", "x86_64", imageName, registryImage, build.RefTag())},
 		}
 		pwshBuildSet.componentBuilds = append(pwshBuildSet.componentBuilds, pwshBuild)
 		if build.IsLatest() {
-			pwshBuild.aliasSpecs = append(pwshBuild.aliasSpecs, newHelperTagSpec(prefix, "-pwsh", "x86_64", imageName, registryImage, "latest"))
+			pwshBuild.aliasSpecs = append(pwshBuild.aliasSpecs, newHelperTagSpec(prefix, "pwsh", "x86_64", imageName, registryImage, "latest"))
 		}
 		builds.buildSets = append(builds.buildSets, pwshBuildSet)
 	}
@@ -279,7 +275,7 @@ func releaseImageTagSet(manifestTool *docker.ManifestToolContext, builder *docke
 		}
 	}
 
-	specFile := fmt.Sprintf("out/helper-images/spec-%s-%s.yml", buildSet.manifestTagSpec.prefix, buildSet.manifestTagSpec.version)
+	specFile := fmt.Sprintf("out/helper-images/%s", buildSet.manifestTagSpec.renderSpecFileName())
 	specContent, err := buildSet.renderManifestToolYaml()
 	if err != nil {
 		return err
@@ -300,8 +296,8 @@ func releaseImageTagSet(manifestTool *docker.ManifestToolContext, builder *docke
 	// the single appropriate image for the docker context, not the whole manifest.
 	// For those reasons, on the manifest list side, we create manifest specs for each alias
 	// individually
-	for i, _ := range buildSet.manifestAliasSpecs {
-		specFile := fmt.Sprintf("out/helper-images/spec-%s-%s-%d.yml", buildSet.manifestTagSpec.prefix, buildSet.manifestTagSpec.version, i)
+	for i, alias := range buildSet.manifestAliasSpecs {
+		specFile := fmt.Sprintf("out/helper-images/%s", alias.renderSpecFileName())
 		aliasManifest, err := buildSet.renderManifestToolAliasYaml(i)
 		if err != nil {
 			return err
