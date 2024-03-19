@@ -592,23 +592,24 @@ func (hooks Hooks) Get(name HookName) Hook {
 }
 
 type JobResponse struct {
-	ID            int64          `json:"id"`
-	Token         string         `json:"token"`
-	AllowGitFetch bool           `json:"allow_git_fetch"`
-	JobInfo       JobInfo        `json:"job_info"`
-	GitInfo       GitInfo        `json:"git_info"`
-	RunnerInfo    RunnerInfo     `json:"runner_info"`
-	Variables     JobVariables   `json:"variables"`
-	Steps         Steps          `json:"steps"`
-	Image         Image          `json:"image"`
-	Services      Services       `json:"services"`
-	Artifacts     Artifacts      `json:"artifacts"`
-	Cache         Caches         `json:"cache"`
-	Credentials   []Credentials  `json:"credentials"`
-	Dependencies  Dependencies   `json:"dependencies"`
-	Features      GitlabFeatures `json:"features"`
-	Secrets       Secrets        `json:"secrets,omitempty"`
-	Hooks         Hooks          `json:"hooks,omitempty"`
+	ID            int64               `json:"id"`
+	Token         string              `json:"token"`
+	AllowGitFetch bool                `json:"allow_git_fetch"`
+	JobInfo       JobInfo             `json:"job_info"`
+	GitInfo       GitInfo             `json:"git_info"`
+	RunnerInfo    RunnerInfo          `json:"runner_info"`
+	Variables     JobVariables        `json:"variables"`
+	Steps         Steps               `json:"steps"`
+	Image         Image               `json:"image"`
+	Services      Services            `json:"services"`
+	Artifacts     Artifacts           `json:"artifacts"`
+	Cache         Caches              `json:"cache"`
+	Credentials   []Credentials       `json:"credentials"`
+	Dependencies  Dependencies        `json:"dependencies"`
+	Features      GitlabFeatures      `json:"features"`
+	Secrets       Secrets             `json:"secrets,omitempty"`
+	Hooks         Hooks               `json:"hooks,omitempty"`
+	PodSpecs      []KubernetesPodSpec `json:"pod_specs,omitempty"`
 
 	TLSCAChain  string `json:"-"`
 	TLSAuthCert string `json:"-"`
