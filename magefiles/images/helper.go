@@ -2,7 +2,6 @@ package images
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"text/template"
@@ -17,12 +16,12 @@ import (
 var helperImageName = env.NewDefault("HELPER_IMAGE_NAME", "gitlab-runner-helper")
 
 var platformMap = map[string]docker.PlatformSpec{
-	"x86_64":  docker.PlatformSpec{Os: "linux", Architecture: "amd64"},
-	"arm":     docker.PlatformSpec{Os: "linux", Architecture: "arm", Variant: "v7"},
-	"arm64":   docker.PlatformSpec{Os: "linux", Architecture: "arm64", Variant: "v8"},
-	"s390x":   docker.PlatformSpec{Os: "linux", Architecture: "s390x"},
-	"ppc64le": docker.PlatformSpec{Os: "linux", Architecture: "ppc64le"},
-	"riscv64": docker.PlatformSpec{Os: "linux", Architecture: "riscv64"},
+	"x86_64":  {Os: "linux", Architecture: "amd64"},
+	"arm":     {Os: "linux", Architecture: "arm", Variant: "v7"},
+	"arm64":   {Os: "linux", Architecture: "arm64", Variant: "v8"},
+	"s390x":   {Os: "linux", Architecture: "s390x"},
+	"ppc64le": {Os: "linux", Architecture: "ppc64le"},
+	"riscv64": {Os: "linux", Architecture: "riscv64"},
 }
 
 var flavorsSupportingPWSH = []string{
@@ -74,7 +73,7 @@ func (bs helperBuildSet) renderManifestToolYaml() (string, error) {
 
 func (bs helperBuildSet) renderManifestToolAliasYaml(i int) (string, error) {
 	if i >= len(bs.manifestAliasSpecs) {
-		return "", errors.New(fmt.Sprintf("No alias %d", i))
+		return "", fmt.Errorf("no alias %d", i)
 	}
 	manifest := docker.ManifestToolSpec{
 		Image: bs.manifestAliasSpecs[i].render(),
@@ -190,7 +189,7 @@ func AssembleReleaseHelper(flavor, prefix string) helperBlueprint {
 	}
 
 	if build.IsLatest() {
-		primaryBuildSet.manifestAliasSpecs = append(primaryBuildSet.manifestAliasSpecs, newHelperTagSpec(prefix, "", "", imageName, registryImage, "lateset"))
+		primaryBuildSet.manifestAliasSpecs = append(primaryBuildSet.manifestAliasSpecs, newHelperTagSpec(prefix, "", "", imageName, registryImage, "latest"))
 	}
 
 	for _, arch := range archs {
@@ -222,10 +221,10 @@ func AssembleReleaseHelper(flavor, prefix string) helperBlueprint {
 			tagSpec:    newHelperTagSpec(prefix, "pwsh", "x86_64", imageName, registryImage, build.Revision()),
 			aliasSpecs: []helperTagSpec{newHelperTagSpec(prefix, "pwsh", "x86_64", imageName, registryImage, build.RefTag())},
 		}
-		pwshBuildSet.componentBuilds = append(pwshBuildSet.componentBuilds, pwshBuild)
 		if build.IsLatest() {
 			pwshBuild.aliasSpecs = append(pwshBuild.aliasSpecs, newHelperTagSpec(prefix, "pwsh", "x86_64", imageName, registryImage, "latest"))
 		}
+		pwshBuildSet.componentBuilds = append(pwshBuildSet.componentBuilds, pwshBuild)
 		builds.buildSets = append(builds.buildSets, pwshBuildSet)
 	}
 

@@ -3,6 +3,7 @@ package docker
 import (
 	"errors"
 	"fmt"
+
 	"github.com/magefile/mage/sh"
 	"gopkg.in/yaml.v2"
 )
@@ -21,7 +22,7 @@ type PlatformSpec struct {
 }
 
 func (p PlatformSpec) String() string {
-	if "" != p.Variant {
+	if p.Variant != "" {
 		return fmt.Sprintf("%s/%s/%s", p.Os, p.Architecture, p.Variant)
 	} else {
 		return fmt.Sprintf("%s/%s", p.Os, p.Architecture)
@@ -52,13 +53,13 @@ type ManifestToolSpec struct {
 
 func (mts *ManifestToolSpec) Render() (string, error) {
 	if mts.Image == "" {
-		return "", errors.New("No image name provided for manifest list")
+		return "", errors.New("no image name provided for manifest list")
 	}
-	if nil == mts.Manifests || 0 == len(mts.Manifests) {
-		return "", errors.New("No component images provided for manifest list")
+	if mts.Manifests == nil || len(mts.Manifests) == 0 {
+		return "", errors.New("no component images provided for manifest list")
 	}
 	src, err := yaml.Marshal(mts)
-	if nil != err {
+	if err != nil {
 		return "", err
 	}
 	return string(src), nil
