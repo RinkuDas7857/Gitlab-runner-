@@ -7196,6 +7196,295 @@ containers:
 	}
 }
 
+func TestValidatePodSpecAllowList(t *testing.T) {
+	tests := map[string]struct {
+		podSpec    []common.KubernetesPodSpec
+		allowList  common.KubernetesPodSpecAllowlist
+		errMessage string
+	}{
+		"unauthorized containers property": {
+			podSpec: []common.KubernetesPodSpec{
+				{
+					Patch: `
+hostname: "custom"
+containers:
+- name: build
+  image: alpine:latest
+`,
+					PatchType: common.PatchTypeMergePatchType,
+				},
+			},
+			allowList: common.KubernetesPodSpecAllowlist{
+				AllowList: `
+{
+	"title": "podSpec",
+	"type": "object",
+	"properties": {
+		"hostname": { "type": "string" }
+	},
+	"additionalProperties": false
+}
+`,
+			},
+			errMessage: "Additional property containers is not allowed",
+		},
+		"unauthorized containers>image property": {
+			podSpec: []common.KubernetesPodSpec{
+				{
+					Patch: `
+containers:
+- name: build
+  image: alpine:latest
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+`,
+					PatchType: common.PatchTypeMergePatchType,
+				},
+			},
+			allowList: common.KubernetesPodSpecAllowlist{
+				AllowList: `
+{
+	"title": "podSpec",
+	"type": "object",
+	"properties": {
+		"containers": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/container" }
+		}
+	},
+	"$defs": {
+		"container": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": { "type": "string" },
+				"resources": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"requests": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"cpu": { "type": "string" },
+								"memory": { "type": "string" }
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"additionalProperties": false
+}`,
+			},
+			errMessage: "containers.0: Additional property image is not allowed",
+		},
+		"unauthorized resources with json patch": {
+			podSpec: []common.KubernetesPodSpec{
+				{
+					Patch: `
+[
+	{
+		"op": "add",
+		"path": "/hostname",
+		"value": "custom"
+	},
+	{
+		"op": "replace",
+		"path": "/containers/0/image",
+		"value": "alpine:latest"
+	},
+	{
+		"op": "add",
+		"path": "/containers/-",
+		"value": "{}"
+	},
+	{
+		"op": "remove",
+		"path": "/containers/0/resources"
+	},
+]`,
+					PatchType: common.PatchTypeJSONPatchType,
+				},
+			},
+			allowList: common.KubernetesPodSpecAllowlist{
+				AllowList: `
+{
+	"title": "podSpec",
+	"type": "object",
+	"properties": {
+		"hostname": { "type": "string" },
+		"containers": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/container" }
+		}
+	},
+	"$defs": {
+		"container": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": { "type": "string" }
+			}
+		}
+	},
+	"additionalProperties": false
+}`,
+			},
+			errMessage: errJSONPatchNotSupport.Error(),
+		},
+		"multiples podSpec with one being a json patch": {
+			podSpec: []common.KubernetesPodSpec{
+				{
+					Patch: `
+containers:
+- name: build
+  image: alpine:latest
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+`,
+					PatchType: common.PatchTypeMergePatchType,
+				},
+				{
+					Patch: `
+[
+	{
+		"op": "add",
+		"path": "/hostname",
+		"value": "custom"
+	},
+	{
+		"op": "replace",
+		"path": "/containers/0/image",
+		"value": "alpine:latest"
+	},
+	{
+		"op": "add",
+		"path": "/containers/-",
+		"value": "{}"
+	},
+	{
+		"op": "remove",
+		"path": "/containers/0/resources"
+	},
+]`,
+					PatchType: common.PatchTypeJSONPatchType,
+				},
+			},
+			allowList: common.KubernetesPodSpecAllowlist{
+				AllowList: `
+{
+	"title": "podSpec",
+	"type": "object",
+	"properties": {
+		"containers": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/container" }
+		}
+	},
+	"$defs": {
+		"container": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": { "type": "string" },
+				"image": { "type": "string" },
+				"resources": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"requests": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"cpu": { "type": "string" },
+								"memory": { "type": "string" }
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"additionalProperties": false
+}`,
+			},
+			errMessage: errJSONPatchNotSupport.Error(),
+		},
+		"valid custom podSpec": {
+			podSpec: []common.KubernetesPodSpec{
+				{
+					Patch: `
+containers:
+- name: build
+  image: alpine:latest
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+`,
+					PatchType: common.PatchTypeMergePatchType,
+				},
+			},
+			allowList: common.KubernetesPodSpecAllowlist{
+				AllowList: `
+{
+	"title": "podSpec",
+	"type": "object",
+	"properties": {
+		"containers": {
+			"type": "array",
+			"items": { "$ref": "#/$defs/container" }
+		}
+	},
+	"$defs": {
+		"container": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": { "type": "string" },
+				"image": { "type": "string" },
+				"resources": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"requests": {
+							"type": "object",
+							"additionalProperties": false,
+							"properties": {
+								"cpu": { "type": "string" },
+								"memory": { "type": "string" }
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"additionalProperties": false
+}`,
+			},
+		},
+	}
+
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+			err := validatePodSpecs(tc.podSpec, tc.allowList)
+			if tc.errMessage != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errMessage)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestRetryLimits(t *testing.T) {
 	tests := map[string]struct {
 		config             common.KubernetesConfig
