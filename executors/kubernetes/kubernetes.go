@@ -20,6 +20,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/jpillora/backoff"
 	"github.com/samber/lo"
+	jsonschema "github.com/xeipuuv/gojsonschema"
 	"gitlab.com/gitlab-org/gitlab-runner/common"
 	"gitlab.com/gitlab-org/gitlab-runner/common/buildlogger"
 	"gitlab.com/gitlab-org/gitlab-runner/executors"
@@ -105,7 +106,11 @@ var (
 		ShowHostname: true,
 	}
 
-	errIncorrectShellType = fmt.Errorf("kubernetes executor incorrect shell type")
+	errIncorrectShellType  = fmt.Errorf("kubernetes executor incorrect shell type")
+	errJSONPatchNotSupport = fmt.Errorf(
+		"%v is not supported when pod_spec allowlist is enabled",
+		common.PatchTypeJSONPatchType,
+	)
 
 	DefaultResourceIdentifier  = "default"
 	resourceTypeServiceAccount = "ServiceAccount"
@@ -1678,6 +1683,7 @@ func (s *executor) setupBuildNamespace(ctx context.Context) error {
 	}
 	return err
 }
+
 func (s *executor) teardownBuildNamespace(ctx context.Context) error {
 	if !s.Config.Kubernetes.NamespacePerJob {
 		return nil
@@ -1716,6 +1722,12 @@ func (s *executor) setupBuildPod(ctx context.Context, initContainers []api.Conta
 		s.BuildLogger.Warningln("Advanced Pod Spec configuration enabled, merging the provided PodSpec to the generated one. " +
 			"This is a beta feature and is subject to change. Feedback is collected in this issue: " +
 			"https://gitlab.com/gitlab-org/gitlab-runner/-/issues/29659 ...")
+
+		err := validatePodSpecs(s.Build.PodSpecs, s.Config.Kubernetes.PodSpecAllowList)
+		if err != nil {
+			return err
+		}
+
 		podConfig.Spec, err = s.applyPodSpecMerge(&podConfig.Spec)
 		if err != nil {
 			return err
@@ -2091,6 +2103,41 @@ func doPodSpecMerge(original []byte, spec common.KubernetesPodSpec) ([]byte, err
 	}
 
 	return data, nil
+}
+
+func validatePodSpecs(specs []common.KubernetesPodSpec, allowList common.KubernetesPodSpecAllowlist) error {
+	if allowList.AllowList == "" && allowList.AllowListPath == "" {
+		return nil
+	}
+
+	for _, spec := range specs {
+		allow, err := allowList.PodSpecAllowList()
+		if err != nil {
+			return fmt.Errorf("failed to load pod spec allow lists: %w", err)
+		}
+
+		schema := jsonschema.NewBytesLoader(allow)
+		patch, patchType, err := spec.PodSpecPatch()
+		if err != nil {
+			return fmt.Errorf("failed to load pod spec patch: %w", err)
+		}
+
+		switch patchType {
+		// JSON patch type is not supported for now
+		case common.PatchTypeJSONPatchType:
+			return errJSONPatchNotSupport
+		}
+
+		res, err := jsonschema.Validate(schema, jsonschema.NewBytesLoader(patch))
+		if err != nil {
+			return fmt.Errorf("failed to validate pod spec provided: %w (%s)", err, spec.Name)
+		}
+		if !res.Valid() {
+			return fmt.Errorf("unallowed properties found in the povided pod spec: %s (%s)", res.Errors(), spec.Name)
+		}
+	}
+
+	return nil
 }
 
 func (s *executor) setOwnerReferencesForResources(ctx context.Context, ownerReferences []metav1.OwnerReference) error {
