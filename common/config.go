@@ -621,7 +621,8 @@ type KubernetesConfig struct {
 	DNSConfig                                         KubernetesDNSConfig                `toml:"dns_config" json:"dns_config" description:"Pod DNS config"`
 	ContainerLifecycle                                KubernetesContainerLifecyle        `toml:"container_lifecycle,omitempty" json:"container_lifecycle,omitempty" description:"Actions that the management system should take in response to container lifecycle events"`
 	PriorityClassName                                 string                             `toml:"priority_class_name,omitempty" json:"priority_class_name" long:"priority_class_name" env:"KUBERNETES_PRIORITY_CLASS_NAME" description:"If set, the Kubernetes Priority Class to be set to the Pods"`
-	PodSpec                                           []KubernetesPodSpec                `toml:"pod_spec" json:",omitempty"`
+	PodSpec                                           []KubernetesPodSpec                `toml:"pod_spec,omitempty" json:"pod_spec,omitempty"`
+	PodSpecAllowList                                  KubernetesPodSpecAllowlist         `toml:"pod_spec_allow_list,omitempty" json:"pod_spec_allow_list,omitempty"`
 }
 
 type RequestRetryLimit int
@@ -643,10 +644,10 @@ func (r RequestRetryLimits) AsErrors() []error {
 }
 
 type KubernetesPodSpec struct {
-	Name      string                     `toml:"name"`
-	PatchPath string                     `toml:"patch_path"`
-	Patch     string                     `toml:"patch"`
-	PatchType KubernetesPodSpecPatchType `toml:"patch_type"`
+	Name      string                     `toml:"name" json:"name"`
+	PatchPath string                     `toml:"patch_path" json:"patch_path"`
+	Patch     string                     `toml:"patch" json:"patch"`
+	PatchType KubernetesPodSpecPatchType `toml:"patch_type" json:"patch_type"`
 }
 
 // PodSpecPatch returns the patch data (JSON encoded) and type
@@ -684,6 +685,29 @@ const (
 	PatchTypeMergePatchType          = KubernetesPodSpecPatchType("merge")
 	PatchTypeStrategicMergePatchType = KubernetesPodSpecPatchType("strategic")
 )
+
+type KubernetesPodSpecAllowlist struct {
+	AllowListPath string `toml:"allow_list_path" json:"allow_list_path"`
+	AllowList     string `toml:"allow_list" json:"allow_list"`
+}
+
+func (s *KubernetesPodSpecAllowlist) PodSpecAllowList() ([]byte, error) {
+	schemaBytes := []byte(s.AllowList)
+
+	if s.AllowListPath != "" {
+		if len(s.AllowList) > 0 {
+			return nil, fmt.Errorf("ambiguous schema: both schema path and patch provided")
+		}
+
+		var err error
+		schemaBytes, err = os.ReadFile(s.AllowListPath)
+		if err != nil {
+			return nil, fmt.Errorf("loading patch file: %v", err)
+		}
+	}
+
+	return schemaBytes, nil
+}
 
 type KubernetesDNSConfig struct {
 	Nameservers []string                    `toml:"nameservers" json:",omitempty" description:"A list of IP addresses that will be used as DNS servers for the Pod."`
