@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -246,11 +247,21 @@ func (c *ArtifactsUploaderCommand) normalizeArgs() {
 }
 
 func init() {
+	timeout := os.Getenv("CI_ARTIFACT_RESPONSE_HEADER_TIMEOUT")
+	networkConfig := network.DefaultNetworkConfig()
+
+	if timeout != "" {
+		duration, err := time.ParseDuration(timeout)
+		if err == nil {
+			networkConfig.ResponseHeaderTimeout = duration
+		}
+	}
+
 	common.RegisterCommand2(
 		"artifacts-uploader",
 		"create and upload build artifacts (internal)",
 		&ArtifactsUploaderCommand{
-			network: network.NewGitLabClient(),
+			network: network.NewGitLabClientWithOptions(network.WithNetworkConfig(networkConfig)),
 			Name:    "artifacts",
 		},
 	)
