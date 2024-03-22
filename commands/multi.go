@@ -1297,7 +1297,7 @@ func init() {
 
 	cmd := &RunCommand{
 		ServiceName:          defaultServiceName,
-		network:              network.NewGitLabClientWithAPIRequestsCollector(apiRequestsCollector),
+		network:              network.NewGitLabClientWithOptions(network.WithAPIRequestsCollector(apiRequestsCollector)),
 		apiRequestsCollector: apiRequestsCollector,
 		prometheusLogHook:    prometheus_helper.NewLogHook(),
 		failuresCollector:    prometheus_helper.NewFailuresCollector(),

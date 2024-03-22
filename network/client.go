@@ -68,6 +68,7 @@ type client struct {
 	lastUpdate       string
 	requestBackOffs  map[string]*backoff.Backoff
 	connectionMaxAge time.Duration
+	networkConfig    NetworkConfig
 	lock             sync.Mutex
 
 	requester requester
@@ -215,7 +216,7 @@ func (n *client) createTransport() {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Minute,
+		ResponseHeaderTimeout: n.networkConfig.ResponseHeaderTimeout,
 	}
 	n.Timeout = common.DefaultNetworkClientTimeout
 }
@@ -562,9 +563,16 @@ func (n *client) findCertificate(certificate *string, base string, name string) 
 	}
 }
 
-func WithMaxAge(connectionMaxAge time.Duration) Option {
+func withMaxAge(connectionMaxAge time.Duration) Option {
 	return func(c *client) error {
 		c.connectionMaxAge = connectionMaxAge
+		return nil
+	}
+}
+
+func withNetworkConfig(config NetworkConfig) Option {
+	return func(c *client) error {
+		c.networkConfig = config
 		return nil
 	}
 }

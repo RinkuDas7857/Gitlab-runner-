@@ -37,6 +37,7 @@ type GitLabClient struct {
 	clients map[string]*client
 	lock    sync.Mutex
 
+	networkConfig        NetworkConfig
 	apiRequestsCollector *APIRequestsCollector
 	connectionMaxAge     time.Duration
 }
@@ -59,7 +60,9 @@ func (n *GitLabClient) getClient(credentials requestCredentials) (c *client, err
 	if c == nil {
 		c, err = newClient(
 			credentials,
-			WithMaxAge(n.connectionMaxAge))
+			withMaxAge(n.connectionMaxAge),
+			withNetworkConfig(n.networkConfig),
+		)
 		if err != nil {
 			return
 		}
@@ -1123,12 +1126,33 @@ func (n *GitLabClient) handleResponse(ctx context.Context, res *http.Response, d
 	}
 }
 
-func NewGitLabClientWithAPIRequestsCollector(c *APIRequestsCollector) *GitLabClient {
-	return &GitLabClient{
-		apiRequestsCollector: c,
+type ClientOption = func(client *GitLabClient)
+
+func WithAPIRequestsCollector(c *APIRequestsCollector) ClientOption {
+	return func(client *GitLabClient) {
+		client.apiRequestsCollector = c
 	}
 }
 
+func WithNetworkConfig(config NetworkConfig) ClientOption {
+	return func(client *GitLabClient) {
+		client.networkConfig = config
+	}
+}
+
+func NewGitLabClientWithOptions(options ...ClientOption) *GitLabClient {
+	c := &GitLabClient{}
+
+	for _, o := range options {
+		o(c)
+	}
+
+	return c
+}
+
 func NewGitLabClient() *GitLabClient {
-	return NewGitLabClientWithAPIRequestsCollector(NewAPIRequestsCollector())
+	return NewGitLabClientWithOptions(
+		WithAPIRequestsCollector(NewAPIRequestsCollector()),
+		WithNetworkConfig(DefaultNetworkConfig()),
+	)
 }

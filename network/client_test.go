@@ -128,6 +128,19 @@ func TestNewClient(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	assert.Equal(t, "http://test.example.com/api/v4/", c.url.String())
+	assert.Equal(t, time.Duration(0), c.networkConfig.ResponseHeaderTimeout)
+}
+
+func TestNewClientWithNetworkConfig(t *testing.T) {
+	c := NewGitLabClientWithOptions(
+		WithNetworkConfig(
+			NetworkConfig{
+				ResponseHeaderTimeout: 1 * time.Hour,
+			},
+		),
+	)
+	assert.NotNil(t, c)
+	assert.Equal(t, 1*time.Hour, c.networkConfig.ResponseHeaderTimeout)
 }
 
 func TestInvalidUrl(t *testing.T) {
