@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"gitlab.com/gitlab-org/fleeting/fleeting"
+	"gitlab.com/gitlab-org/fleeting/fleeting-artifact/pkg/installer"
 	"gitlab.com/gitlab-org/fleeting/fleeting/connector"
 	flprometheus "gitlab.com/gitlab-org/fleeting/fleeting/metrics/prometheus"
 	fleetingprovider "gitlab.com/gitlab-org/fleeting/fleeting/provider"
@@ -122,7 +123,12 @@ func (p *provider) init(config *common.RunnerConfig) (taskscaler.Taskscaler, boo
 		return nil, false, fmt.Errorf("marshaling plugin config: %w", err)
 	}
 
-	runner, err := p.fleetingRunPlugin(config.Autoscaler.Plugin, pluginCfg)
+	pluginPath, err := installer.LookPath(config.Autoscaler.Plugin, "")
+	if err != nil {
+		return nil, false, fmt.Errorf("loading fleeting plugin: %w", err)
+	}
+
+	runner, err := p.fleetingRunPlugin(pluginPath, pluginCfg)
 	if err != nil {
 		return nil, false, fmt.Errorf("running autoscaler plugin: %w", err)
 	}
